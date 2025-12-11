@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Plataforma Fluida com Sons</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #222;
+            flex-direction: column;
+            user-select: none;
+        }
+        canvas {
+            background-color: #87CEEB; /* Cor do céu */
+            border: 4px solid #fff;
+            box-shadow: 0px 0px 20px rgba(0,0,0,0.5);
+            max-width: 95vw; /* Responsividade no celular */
+        }
+        h1 { color: white; margin-bottom: 10px; }
+
+        /* Estilos dos Controles Mobile */
+        .controls {
+            display: none; /* Inicia escondido */
+            margin-top: 15px;
+            width: 90%;
+            max-width: 400px;
+            justify-content: space-between;
+            padding: 0 5px;
+        }
+        .controls-left {
+            display: flex;
+            gap: 10px;
+        }
+        button.d-pad {
+            width: 60px;
+            height: 60px;
+            background-color: #444;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 4px 0 #222;
+        }
+        button.d-pad:active { 
+            background-color: #3498db; 
+            transform: translateY(4px);
+            box-shadow: none;
+        }
+
+        /* Mostra os controles apenas em telas pequenas */
+        @media (max-width: 800px) {
+            .controls {
+                display: flex;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<h1>Protótipo de Plataforma</h1>
+<canvas id="gameCanvas" width="800" height="400"></canvas>
+
+<div class="controls">
+    <div class="controls-left">
+        <button class="d-pad" id="btnLeft">⬅️</button>
+        <button class="d-pad" id="btnRight">➡️</button>
+    </div>
+    <button class="d-pad" id="btnJump">⬆️</button>
+</div>
+
+<script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    // --- 1. SISTEMA DE ÁUDIO ---
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = new AudioContext();
+
+    function playSound(type) {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        
+        if (type === 'jump') {
+            oscillator.type = 'triangle';
+            oscillator.frequency.setValueAtTime(440, audioCtx.currentTime);
+            gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + 0.15);
+        } else if (type === 'land') {
+            // Som de pouso: 'thump' rápido e grave
+            oscillator.type = 'square';
+            oscillator.frequency.setValueAtTime(100, audioCtx.currentTime);
+            gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + 0.05);
+        } else if (type === 'die') {
+            // Som de morte: descendente
+            oscillator.type = 'sawtooth';
+            oscillator.frequency.setValueAtTime(200, audioCtx.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.5);
+            gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+            gainNode.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + 0.5);
+        }
+    }
+
+
+    // --- 2. CONFIGURAÇÕES E VARIÁVEIS ---
+    const gravity = 0.6;
+    const friction = 0.85; // Aumentei a fricção para deslizar mais
+    
+    let cameraX = 0;
+    let score = 0;
+    let isGameOver = false; // Novo controle de estado
+
+    const player = {
+        x: 50,
+        y: 200,
+        width: 30,
+        height: 30,
+        speed: 6,
+        dx: 0, 
+        dy: 0, 
+        jumping: true, // Começa como true para a gravidade agir
+        wasOnGround: false, // Novo estado para pouso
+        dead: false,
+        color: "red"
+    };
+
+    let platforms = [];
+    let enemies = [];
+    let lastPlatformX = 0;
+    let lastPlatformY = 350;
+
+    // --- 3. LOOP DE ANIMAÇÃO E FLUIDEZ ---
+    let lastTime = 0;
+    
+    function gameLoop(time) {
+        if (isGameOver) return;
+        
+        // requestAnimationFrame garante que o loop roda na taxa do monitor (60fps)
+        requestAnimationFrame(gameLoop);
+
+        // O 'dt' (delta time) é a chave da fluidez.
+        // Ele mede o tempo real que passou desde o último quadro.
+        const dt = time - lastTime;
+        lastTime = time;
+
+        // Chamamos update e draw, mas passamos o tempo real (dt) para o cálculo.
+        update(dt);
+        draw();
+    }
+
+    // Função de Geração de Mundo e Inicialização (Mantida)
+    function initGame() {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        
+        player.x = 50;
+        player.y = 200;
+        player.dx = 0;
+        player.dy = 0;
+        player.jumping = true;
+        player.dead = false;
+        player.wasOnGround = false;
+        cameraX = 0;
+        score = 0;
+        isGameOver = false;
+        platforms = [];
+        enemies = [];
+        lastPlatformX = 0;
+        lastPlatformY = 350;
+        lastTime = 0; 
+        
+        // Cria o chão inicial
+        createPlatform(0, 350, 800, 50, false);
+        lastPlatformX = 800;
+
+        // Inicia o loop
+        requestAnimationFrame(gameLoop);
+    }
+
+    function createPlatform(x, y, w, h, canSpawnEnemy) {
+        platforms.push({ x, y, w, h });
+
+        if (canSpawnEnemy && w > 100 && Math.random() < 0.3) {
+            enemies.push({
+                x: x + 40,      
+                y: y - 30,      
+                w: 30, h: 30,
+                speed: 2,       
+                minX: x,        
+                maxX: x + w,
+                color: "#800080"
+            });
+        }
+    }
+
+    function generateWorld() {
+        while (lastPlatformX < cameraX + canvas.width + 200) {
+            let gap = Math.floor(Math.random() * 90) + 50; 
+            
+            const maxUp = 100;
+            const maxDown = 80;
+            let minY = lastPlatformY - maxUp; 
+            let maxY = lastPlatformY + maxDown;
+            if (minY < 120) minY = 120;
+            if (maxY > 360) maxY = 360;
+            let newY = Math.floor(Math.random() * (maxY - minY + 1)) + minY;
+
+            let newW = Math.floor(Math.random() * 200) + 100;
+
+            createPlatform(lastPlatformX + gap, newY, newW, 40, true);
+            
+            lastPlatformX += gap + newW;
+            lastPlatformY = newY;
+        }
+
+        if (platforms.length > 0 && platforms[0].x + platforms[0].w < cameraX - 100) {
+            platforms.shift();
+            score++; 
+        }
+
+        enemies = enemies.filter(e => e.x + e.w > cameraX - 100);
+    }
+    
+    // --- 4. FUNÇÃO UPDATE (LÓGICA E FÍSICA) ---
+    function update(dt) {
+        // Multiplicamos a física por dt/16 (para manter a velocidade de 60fps)
+        const frameAdjust = dt / 16; 
+        
+        // 4a. Aplicar Controles e Gravidade
+        if (keys.right) player.dx = player.speed;
+        if (keys.left) player.dx = -player.speed;
+        
+        // Pulo e Som
+        if (keys.jump && !player.jumping) {
+            player.jumping = true;
+            player.dy = -12; 
+            playSound('jump');
+        }
+
+        player.dy += gravity * frameAdjust; // Gravidade mais suave
+        player.dx *= friction; 
+
+        // 4b. Atualizar Posição
+        player.x += player.dx * frameAdjust;
+        player.y += player.dy * frameAdjust;
+
+        // 4c. Colisão com o Chão/Plataformas
+        let onGround = false;
+        player.wasOnGround = onGround; // Salva o estado antes da verificação
+
+        for (let plat of platforms) {
+            if (player.x < plat.x + plat.w &&
+                player.x + player.width > plat.x &&
+                player.y < plat.y + plat.h &&
+                player.y + player.height > plat.y) {
+                
+                if (player.dy > 0 && player.y + player.height - player.dy <= plat.y) {
+                    player.jumping = false;
+                    player.dy = 0;
+                    player.y = plat.y - player.height;
+                    onGround = true;
+
+                    // Toca som se acabou de pousar (estava no ar e agora tocou no chão)
+                    if (player.wasOnGround === false) {
+                        playSound('land');
+                    }
+                }
+            }
+        }
+        
+        player.wasOnGround = onGround; // Atualiza o estado
+
+        // 4d. Lógica Inimigos (Patrulha e Colisão)
+        for (let i = enemies.length - 1; i >= 0; i--) {
+            let enemy = enemies[i];
+            enemy.x += enemy.speed * frameAdjust;
+            
+            if (enemy.x <= enemy.minX || enemy.x + enemy.w >= enemy.maxX) {
+                enemy.speed *= -1;
+            }
+
+            // Colisão Player vs Inimigo
+            if (player.x < enemy.x + enemy.w &&
+                player.x + player.width > enemy.x &&
+                player.y < enemy.y + enemy.h &&
+                player.y + player.height > enemy.y) {
+                
+                const playerBottom = player.y + player.height;
+                
+                if (player.dy > 0 && playerBottom < enemy.y + (enemy.h / 2) + 15) {
+                    // MATOU (Pulo)
+                    enemies.splice(i, 1); 
+                    player.dy = -8; 
+                    playSound('jump'); // Pulo de rebote usa o som de pulo
+                    score += 5; 
+                } else {
+                    // MORREU
+                    gameOver();
+                }
+            }
+        }
+
+        // 4e. Câmera, Geração e Morte
+        if (player.y > canvas.height) {
+            gameOver();
+        }
+
+        if (player.x > cameraX + 200) {
+            cameraX = player.x - 200;
+        }
+        if (cameraX < 0) cameraX = 0;
+
+        generateWorld();
+    }
+    
+    function gameOver() {
+        isGameOver = true;
+        playSound('die'); // Som de Game Over
+        alert("Game Over! Pontos: " + score + ". Pressione OK para reiniciar.");
+        initGame();
+    }
+
+    // --- 5. FUNÇÃO DRAW (Desenho) ---
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        ctx.save();
+        ctx.translate(-cameraX, 0);
+
+        // Plataformas
+        ctx.fillStyle = "#654321";
+        for (let plat of platforms) {
+            ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
+            ctx.fillStyle = "#32CD32";
+            ctx.fillRect(plat.x, plat.y, plat.w, 5);
+            ctx.fillStyle = "#654321";
+        }
+
+        // Inimigos
+        ctx.fillStyle = "#800080";
+        for (let enemy of enemies) {
+            ctx.fillRect(enemy.x, enemy.y, enemy.w, enemy.h);
+            ctx.fillStyle = "white";
+            ctx.fillRect(enemy.x + 5, enemy.y + 5, 5, 5); 
+            ctx.fillRect(enemy.x + 20, enemy.y + 5, 5, 5);
+        }
+
+        // Jogador
+        ctx.fillStyle = player.color;
+        ctx.fillRect(player.x, player.y, player.width, player.height);
+
+        ctx.restore();
+
+        // HUD (Score)
+        ctx.fillStyle = "black";
+        ctx.font = "20px Arial";
+        ctx.fillText(`Score: ${score}`, 20, 30);
+    }
+
+    // --- 6. CONTROLES E INICIALIZAÇÃO ---
+    const keys = { right: false, left: false, jump: false };
+
+    document.addEventListener("keydown", (e) => {
+        if (e.code === "ArrowRight") keys.right = true;
+        if (e.code === "ArrowLeft") keys.left = true;
+        if (e.code === "Space" || e.code === "ArrowUp") {
+            keys.jump = true;
+            e.preventDefault();
+        }
+    });
+
+    document.addEventListener("keyup", (e) => {
+        if (e.code === "ArrowRight") keys.right = false;
+        if (e.code === "ArrowLeft") keys.left = false;
+        if (e.code === "Space" || e.code === "ArrowUp") keys.jump = false;
+    });
+
+    // Controles Mobile
+    document.getElementById("btnLeft").ontouchstart = (e) => { e.preventDefault(); keys.left = true; };
+    document.getElementById("btnLeft").ontouchend = () => keys.left = false;
+    
+    document.getElementById("btnRight").ontouchstart = (e) => { e.preventDefault(); keys.right = true; };
+    document.getElementById("btnRight").ontouchend = () => keys.right = false;
+
+    document.getElementById("btnJump").ontouchstart = (e) => { e.preventDefault(); keys.jump = true; };
+    document.getElementById("btnJump").ontouchend = () => keys.jump = false;
+
+    // Inicia o Jogo
+    initGame();
+</script>
+</body>
+</html>

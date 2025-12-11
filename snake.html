@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Snake Ajustado</title>
+    <title>Snake Responsivo</title>
     <style>
         body {
-            height: 100vh;
+            /* MUDANÇA 1: Permite rolar a tela e usa altura mínima */
+            min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -16,22 +17,36 @@
             color: white;
             font-family: Arial, sans-serif;
             touch-action: manipulation;
-            overflow: hidden;
+            padding: 10px 0; /* Espaço nas pontas */
         }
         
-        h1 { margin: 10px 0; font-size: 24px; }
+        h1 { margin: 5px 0; font-size: 20px; }
+
+        /* Relógio menor */
+        #digitalClock {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 16px;
+            color: #4CAF50;
+            background-color: #000;
+            padding: 4px 12px;
+            border-radius: 5px;
+            border: 1px solid #333;
+            margin-bottom: 10px;
+            text-align: center;
+        }
 
         .game-container {
             position: relative;
-            /* Tamanho fixo da lógica */
             width: 500px;
             height: 500px;
             
-            /* Ajuste visual */
-            max-width: 95vw;
-            max-height: 95vw;
-            
-            /* A borda agora fica FORA do tamanho da caixa (outline) para não espremer o jogo */
+            /* MUDANÇA 2: O Pulo do Gato para Celular */
+            /* Ocupa no máximo 90% da largura OU 55% da altura da tela */
+            /* Isso garante que sempre sobre espaço embaixo para os botões */
+            max-width: 90vw;
+            max-height: 55vh; 
+            aspect-ratio: 1 / 1; /* Mantém sempre quadrado */
+
             outline: 4px solid #4CAF50; 
             background-color: #000;
             box-shadow: 0px 0px 30px rgba(0,0,0,0.6);
@@ -43,7 +58,7 @@
             height: 100%;
         }
 
-        /* --- MENU --- */
+        /* --- MENUS --- */
         #startScreen {
             position: absolute;
             top: 0;
@@ -59,8 +74,8 @@
         }
 
         #btnStart {
-            padding: 20px 50px;
-            font-size: 24px;
+            padding: 15px 40px;
+            font-size: 20px;
             background-color: #4CAF50;
             color: white;
             border: none;
@@ -73,8 +88,8 @@
         #btnStart:active { transform: translateY(2px); box-shadow: none; }
 
         .score-display {
-            font-size: 30px;
-            margin-bottom: 25px;
+            font-size: 24px;
+            margin-bottom: 20px;
             color: #fff;
             display: none; 
             font-weight: bold;
@@ -82,35 +97,35 @@
 
         #speedIndicator {
             position: absolute;
-            top: 10px;
-            right: 10px;
+            top: 5px;
+            right: 5px;
             color: yellow;
             font-weight: bold;
-            font-size: 16px;
+            font-size: 14px;
             z-index: 5;
             background: rgba(0,0,0,0.5);
-            padding: 5px 10px;
+            padding: 4px 8px;
             border-radius: 5px;
         }
 
-        /* Controles */
+        /* --- CONTROLES (MUDANÇA 3: Ajustes de tamanho) --- */
         .controls {
             display: none;
-            margin-top: 25px; /* Mais espaço para não colar na borda */
+            margin-top: 15px; /* Menos espaço */
             flex-direction: column;
             align-items: center;
-            gap: 10px;
+            gap: 5px; /* Botões mais juntos */
         }
-        .row { display: flex; gap: 10px; }
+        .row { display: flex; gap: 5px; }
 
         button.d-pad {
-            width: 70px;
-            height: 70px;
+            width: 60px; /* Um pouco menor para caber melhor */
+            height: 60px;
             background-color: #444;
             color: white;
             border: none;
-            border-radius: 15px;
-            font-size: 30px;
+            border-radius: 12px;
+            font-size: 24px;
             cursor: pointer;
             touch-action: manipulation;
             box-shadow: 0 4px 0 #222;
@@ -123,6 +138,7 @@
 <body>
 
     <h1>Snake Game</h1>
+    <div id="digitalClock">--:--:--</div>
 
     <div class="game-container">
         <canvas id="gameCanvas" width="500" height="500"></canvas>
@@ -144,6 +160,16 @@
     </div>
 
     <script>
+        // --- RELÓGIO ---
+        function updateClock() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('pt-BR');
+            document.getElementById('digitalClock').innerText = timeString;
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // --- LÓGICA DO JOGO ---
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
         const startScreen = document.getElementById("startScreen");
@@ -186,7 +212,6 @@
             level = 1;
             currentSpeed = startSpeed;
             updateLevelDisplay();
-            
             createFood();
 
             if(gameLoop) clearInterval(gameLoop);
@@ -239,25 +264,18 @@
 
         function draw() {
             direction = nextDirection;
-
-            // Fundo
+            
             ctx.fillStyle = "#111"; 
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Comida
             ctx.fillStyle = "#ff3333";
             ctx.fillRect(food.x, food.y, box, box);
             
-            // Cobra
             for(let i = 0; i < snake.length; i++) {
                 ctx.fillStyle = (i == 0) ? "#4CAF50" : "#FFFFFF"; 
                 ctx.fillRect(snake[i].x, snake[i].y, box, box);
-                
-                // MUDANÇA AQUI:
-                // Agora a borda é verde escura, não preta. 
-                // Isso faz você ver exatamente onde a cobra termina.
                 ctx.strokeStyle = "#2E7D32"; 
-                ctx.lineWidth = 1; // Borda mais fina
+                ctx.lineWidth = 1; 
                 ctx.strokeRect(snake[i].x, snake[i].y, box, box);
             }
 
@@ -279,7 +297,6 @@
 
             let newHead = { x: snakeX, y: snakeY };
 
-            // Verificação de Colisão
             if(snakeX < 0 || snakeX >= canvas.width || 
                snakeY < 0 || snakeY >= canvas.height || 
                collision(newHead, snake)) {

@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Plataforma Completa</title>
+    <title>Plataforma com Personagem</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
         body {
@@ -15,7 +15,7 @@
             flex-direction: column;
             user-select: none;
             padding: 10px 0;
-            font-family: Arial, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
         
         .game-container {
@@ -26,25 +26,25 @@
             max-height: 55vh; 
             outline: 4px solid #fff;
             box-shadow: 0px 0px 20px rgba(0,0,0,0.5);
-            overflow: hidden; /* Garante que o menu não vaze */
+            overflow: hidden;
+            background-color: #87CEEB; /* Céu */
         }
 
         canvas {
-            background-color: #87CEEB; 
             display: block;
             width: 100%;
             height: 100%;
         }
         
-        /* --- MENU DE INÍCIO / GAME OVER --- */
+        /* MENU */
         #startScreen {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.85); /* Fundo escuro transparente */
-            display: flex; /* Começa visível */
+            background-color: rgba(0, 0, 0, 0.85);
+            display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
@@ -68,10 +68,10 @@
         }
         #btnStart:active { transform: translateY(2px); box-shadow: none; }
 
-        .big-text { font-size: 32px; font-weight: bold; color: #f1c40f; margin-bottom: 10px; }
-        .small-text { font-size: 18px; color: #ccc; }
+        .big-text { font-size: 32px; font-weight: bold; color: #f1c40f; margin-bottom: 10px; text-shadow: 2px 2px #000; }
+        .small-text { font-size: 18px; color: #fff; text-shadow: 1px 1px #000; }
 
-        /* HUD durante o jogo */
+        /* HUD */
         .score-info { 
             position: absolute; 
             top: 10px; 
@@ -79,9 +79,13 @@
             color: black; 
             font-weight: bold;
             z-index: 10;
+            font-size: 18px;
+            background: rgba(255,255,255,0.5);
+            padding: 5px 10px;
+            border-radius: 5px;
         }
 
-        /* --- CONTROLES MOBILE --- */
+        /* CONTROLES MOBILE */
         .controls {
             display: none; 
             margin-top: 15px;
@@ -124,7 +128,6 @@
         <div id="finalScoreText" style="display:none; color: #ff6b6b; margin-top:10px; font-weight:bold;"></div>
         <button id="btnStart">INICIAR</button>
     </div>
-
 </div>
 
 <div class="controls">
@@ -139,7 +142,7 @@
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
     
-    // Elementos do DOM
+    // Elementos DOM
     const startScreen = document.getElementById("startScreen");
     const btnStart = document.getElementById("btnStart");
     const menuTitle = document.getElementById("menuTitle");
@@ -148,7 +151,7 @@
     const currentScoreDisplay = document.getElementById("currentScore");
     const highScoreDisplay = document.getElementById("highScoreDisplay");
     
-    // --- 1. SISTEMA DE ÁUDIO ---
+    // --- 1. ÁUDIO ---
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     const audioCtx = new AudioContext();
 
@@ -176,26 +179,26 @@
         }
     }
 
-    // --- 2. CONFIGURAÇÕES ---
+    // --- 2. VARIAVEIS ---
     const gravity = 0.6;
     const friction = 0.85; 
     
     let cameraX = 0;
     let score = 0;
-    let isGameOver = true; // Começa como TRUE para mostrar o menu
+    let isGameOver = true; 
     let lastTime = 0; 
     let animationFrameId = null;
 
     const player = {
         x: 50,
         y: 0, 
-        width: 30,
-        height: 30,
+        width: 32,
+        height: 32,
         speed: 6,
         dx: 0, 
         dy: 0, 
         jumping: false, 
-        color: "red"
+        facing: 'right' 
     };
 
     let platforms = [];
@@ -208,17 +211,12 @@
 
     const keys = { right: false, left: false, jump: false };
 
-    // --- 3. INICIALIZAÇÃO E MENUS ---
-    
-    // Configura o botão
-    btnStart.addEventListener("click", () => {
-        initGame();
-    });
+    // --- 3. INICIALIZAÇÃO ---
+    btnStart.addEventListener("click", () => { initGame(); });
 
     function initGame() {
         if (audioCtx.state === 'suspended') audioCtx.resume();
         
-        // Reseta Variáveis
         platforms = [];
         lastPlatformX = 0;
         lastPlatformY = 350;
@@ -226,24 +224,22 @@
         score = 0;
         lastTime = 0; 
 
-        // Cria o chão inicial
-        createPlatform(0, 350, 800, 50, false);
+        // Chão inicial
+        createPlatform(0, 350, 800, 50);
         
-        // POSICIONAMENTO FINAL DE ESTABILIDADE
+        // Posição
         player.x = 50;
         player.y = platforms[0].y - player.height; 
         player.dx = 0;
         player.dy = 0;
         player.jumping = false; 
+        player.facing = 'right'; 
         
-        // Atualiza HUD
         currentScoreDisplay.innerText = score;
         
-        // Esconde Menu e Inicia
         startScreen.style.display = "none";
         isGameOver = false;
 
-        // Inicia o loop
         if (animationFrameId) cancelAnimationFrame(animationFrameId);
         animationFrameId = requestAnimationFrame(gameLoop);
     }
@@ -252,7 +248,6 @@
         isGameOver = true;
         playSound('die');
 
-        // Atualiza Recorde
         if (score > highScore) {
             highScore = score;
             localStorage.setItem('platformHighScore', highScore);
@@ -262,13 +257,11 @@
             menuHighScore.innerText = highScore;
         }
 
-        // Configura texto do Menu
         menuTitle.innerText = "GAME OVER";
         finalScoreText.innerText = "Sua Pontuação: " + score;
         finalScoreText.style.display = "block";
         btnStart.innerText = "TENTAR NOVAMENTE";
         
-        // Mostra o Menu
         startScreen.style.display = "flex";
     }
 
@@ -281,20 +274,23 @@
         const dt = time - lastTime;
         lastTime = time;
 
-        // Evita saltos grandes se o jogo travar
         const frameAdjust = Math.min(dt / 16, 2); 
         
         update(frameAdjust);
         draw();
     }
 
-
-    // --- 5. LÓGICA DO JOGO (UPDATE) ---
+    // --- 5. UPDATE ---
     function update(frameAdjust) {
         
-        // Controles
-        if (keys.right) player.dx = player.speed;
-        if (keys.left) player.dx = -player.speed;
+        if (keys.right) {
+            player.dx = player.speed;
+            player.facing = 'right'; 
+        }
+        if (keys.left) {
+            player.dx = -player.speed;
+            player.facing = 'left'; 
+        }
         
         let wasJumping = player.jumping; 
 
@@ -304,33 +300,26 @@
             playSound('jump');
         }
 
-        // Física
         player.dy += gravity * frameAdjust;
         player.dx *= friction; 
 
         player.x += player.dx * frameAdjust;
         player.y += player.dy * frameAdjust;
 
-        // Colisão Robusta
         let onGround = false;
-
         for (let plat of platforms) {
             if (player.x < plat.x + plat.w &&
                 player.x + player.width > plat.x &&
                 player.y < plat.y + plat.h &&
                 player.y + player.height > plat.y) {
                 
-                // Caindo
                 if (player.dy >= 0) { 
-                    player.y = plat.y - player.height; // Corrige posição
-                    
+                    player.y = plat.y - player.height; 
                     if (wasJumping) playSound('land');
-                    
                     player.jumping = false;
                     player.dy = 0;
                     onGround = true;
                 }
-                // Batendo cabeça
                 else if (player.dy < 0) {
                     player.dy = 0;
                     player.y = plat.y + plat.h; 
@@ -338,17 +327,13 @@
             }
         }
         
-        if (!onGround) {
-            player.jumping = true; 
-        }
+        if (!onGround) player.jumping = true; 
 
-        // Morte
         if (player.y > canvas.height) {
             showGameOver();
             return;
         }
 
-        // Câmera
         if (player.x > cameraX + 200) {
             cameraX = player.x - 200;
         }
@@ -357,8 +342,7 @@
         generateWorld();
     }
     
-    // --- 6. GERAÇÃO DE MUNDO ---
-
+    // --- 6. MUNDO ---
     function createPlatform(x, y, w, h) {
         platforms.push({ x, y, w, h });
     }
@@ -390,7 +374,7 @@
         }
     }
 
-    // --- 7. DESENHO ---
+    // --- 7. DESENHO (DRAW) ---
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -398,21 +382,47 @@
         ctx.translate(-cameraX, 0);
 
         // Plataformas
-        ctx.fillStyle = "#654321";
+        ctx.fillStyle = "#5D4037"; // Terra
         for (let plat of platforms) {
             ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
-            ctx.fillStyle = "#32CD32"; // Grama
-            ctx.fillRect(plat.x, plat.y, plat.w, 5);
+            ctx.fillStyle = "#4CAF50"; // Grama
+            ctx.fillRect(plat.x, plat.y, plat.w, 8); 
+            ctx.fillStyle = "#5D4037";
         }
 
-        // Jogador
-        ctx.fillStyle = player.color;
-        ctx.fillRect(player.x, player.y, player.width, player.height);
+        // --- DESENHO DO PERSONAGEM (Código, não imagem) ---
+        // Aqui desenhamos o robô usando quadrados para ele nunca sumir
+        ctx.save();
+        
+        // Vai para o centro do jogador
+        ctx.translate(player.x + player.width / 2, player.y + player.height / 2);
+        
+        // Vira o personagem se estiver olhando para esquerda
+        if (player.facing === 'left') {
+            ctx.scale(-1, 1); 
+        }
 
-        ctx.restore();
+        // 1. Corpo
+        ctx.fillStyle = "#e74c3c"; // Vermelho
+        ctx.fillRect(-12, -10, 24, 26);
+
+        // 2. Cabeça
+        ctx.fillStyle = "#ecf0f1"; // Branco
+        ctx.fillRect(-10, -26, 20, 16);
+
+        // 3. Olhos (Visor)
+        ctx.fillStyle = "#3498db"; // Azul
+        ctx.fillRect(2, -22, 10, 6);
+
+        // 4. Mochila a Jato (Jetpack)
+        ctx.fillStyle = "#95a5a6"; // Cinza
+        ctx.fillRect(-16, -8, 4, 16);
+
+        ctx.restore(); // Restaura virada
+        ctx.restore(); // Restaura câmera
     }
 
-    // --- 8. CONTROLES ---
+    // --- 8. EVENTOS ---
     document.addEventListener("keydown", (e) => {
         if (e.code === "ArrowRight") keys.right = true;
         if (e.code === "ArrowLeft") keys.left = true;
@@ -420,10 +430,7 @@
             keys.jump = true;
             e.preventDefault();
         }
-        // Atalho Enter para reiniciar no Game Over
-        if (e.code === "Enter" && isGameOver) {
-            initGame();
-        }
+        if (e.code === "Enter" && isGameOver) initGame();
     });
 
     document.addEventListener("keyup", (e) => {
@@ -432,19 +439,15 @@
         if (e.code === "Space" || e.code === "ArrowUp") keys.jump = false;
     });
 
-    // Mobile
     document.getElementById("btnLeft").ontouchstart = (e) => { e.preventDefault(); keys.left = true; };
     document.getElementById("btnLeft").ontouchend = () => keys.left = false;
-    
     document.getElementById("btnRight").ontouchstart = (e) => { e.preventDefault(); keys.right = true; };
     document.getElementById("btnRight").ontouchend = () => keys.right = false;
-
     document.getElementById("btnJump").ontouchstart = (e) => { e.preventDefault(); keys.jump = true; };
     document.getElementById("btnJump").ontouchend = () => keys.jump = false;
-    
-    // Desenha a tela inicial uma vez (sem rodar a física) para não ficar branco
-    // Cria chão fictício para desenho inicial
-    createPlatform(0, 350, 800, 50, false);
+
+    // Desenha a tela inicial (fundo)
+    createPlatform(0, 350, 800, 50);
     draw();
 
 </script>

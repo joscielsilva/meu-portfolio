@@ -53,7 +53,7 @@
         #btnStart {
             padding: 15px 40px;
             font-size: 20px;
-            background-color: #3498db; /* Azul */
+            background-color: #3498db;
             color: white;
             border: none;
             border-radius: 8px;
@@ -138,7 +138,7 @@
         oscillator.connect(gainNode);
         gainNode.connect(audioCtx.destination);
         
-        if (type === 'jump' || type === 'land') { // Simplificado
+        if (type === 'jump' || type === 'land') {
             oscillator.type = 'square';
             oscillator.frequency.setValueAtTime(type === 'jump' ? 600 : 100, audioCtx.currentTime);
             gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
@@ -163,12 +163,11 @@
     
     let cameraX = 0;
     let score = 0;
-    let isGameOver = true; // Começa no menu
+    let isGameOver = true; 
     let lastTime = 0; // Para requestAnimationFrame
 
     const player = {
         x: 50,
-        // Y será ajustado na inicialização
         y: 0, 
         width: 30,
         height: 30,
@@ -176,7 +175,7 @@
         dx: 0, 
         dy: 0, 
         jumping: true, 
-        wasOnGround: false,
+        wasOnGround: false, // Usado para tocar o som de pouso
         color: "red"
     };
 
@@ -185,15 +184,12 @@
     let lastPlatformX = 0;
     let lastPlatformY = 350;
 
-    // Recorde LocalStorage
     let highScore = localStorage.getItem('platformHighScore') || 0;
     highScoreDisplay.innerText = highScore;
 
-    // Controles
     const keys = { right: false, left: false, jump: false };
 
     // --- 3. INICIALIZAÇÃO E MENUS ---
-
     btnStart.addEventListener("click", initGame);
 
     function initGame() {
@@ -207,13 +203,13 @@
         // Cria o chão inicial
         createPlatform(0, 350, 800, 50, false);
         
-        // --- CORREÇÃO DE FÍSICA AQUI ---
         // Pousa o jogador na primeira plataforma criada
         player.x = 50;
-        player.y = platforms[0].y - player.height; // Coloca na altura exata do chão
+        player.y = platforms[0].y - player.height; 
         player.dx = 0;
         player.dy = 0;
-        player.jumping = false; // Começa no chão
+        player.jumping = false; 
+        player.wasOnGround = true; // Força como se estivesse no chão para não cair
         
         cameraX = 0;
         score = 0;
@@ -277,6 +273,7 @@
             playSound('jump');
         }
 
+        // Aplica Gravidade e Fricção
         player.dy += gravity * frameAdjust;
         player.dx *= friction; 
 
@@ -287,21 +284,27 @@
         // 5c. Colisão com o Chão/Plataformas
         let onGround = false;
         let landingNow = false;
+        let originalY = player.y; // Posição Y antes de verificar colisão
 
         for (let plat of platforms) {
+            // Teste de Colisão (simples AABB)
             if (player.x < plat.x + plat.w &&
                 player.x + player.width > plat.x &&
                 player.y < plat.y + plat.h &&
                 player.y + player.height > plat.y) {
                 
                 // Colisão por cima (Pouso)
-                if (player.dy > 0 && player.y + player.height - player.dy * 1.1 <= plat.y) {
-                    // Verifica se estava pulando antes
+                // Se estava se movendo para baixo (player.dy > 0) E
+                // a posição anterior Y estava acima da plataforma:
+                if (player.dy > 0 && originalY + player.height <= plat.y) {
+                    
+                    // Verifica se estava pulando antes para saber se tocou no chão
                     if (player.jumping) landingNow = true;
                     
                     player.jumping = false;
                     player.dy = 0;
-                    player.y = plat.y - player.height;
+                    // Força a posição para o topo exato da plataforma
+                    player.y = plat.y - player.height; 
                     onGround = true;
                 }
             }
@@ -312,12 +315,15 @@
             playSound('land');
         }
 
-        // 5d. Morte (Cair no buraco)
+        // 5d. Colisão com Inimigos (Morte ou Rebote)
+        // (Lógica de inimigos deve ser adicionada aqui, mas mantida omitida por enquanto para foco na colisão principal)
+        
+        // 5e. Morte (Cair no buraco)
         if (player.y > canvas.height) {
             gameOver();
         }
 
-        // 5e. Câmera e Geração de Mundo
+        // 5f. Câmera e Geração de Mundo
         if (player.x > cameraX + 200) {
             cameraX = player.x - 200;
         }
@@ -330,7 +336,7 @@
 
     function createPlatform(x, y, w, h, canSpawnEnemy) {
         platforms.push({ x, y, w, h });
-        // (Lógica do inimigo omitida para simplificar a correção, mas mantida no código anterior)
+        // Lógica de inimigo (não adicionada para esta correção)
     }
 
     function generateWorld() {
@@ -347,7 +353,6 @@
 
             let newW = Math.floor(Math.random() * 200) + 100;
 
-            // Criar a plataforma. Se o score for alto, tem chance de inimigo
             createPlatform(lastPlatformX + gap, newY, newW, 40, score > 5);
             
             lastPlatformX += gap + newW;
@@ -418,7 +423,6 @@
     document.getElementById("btnJump").ontouchend = () => keys.jump = false;
     
     // Mostra o Menu no carregamento inicial
-    // initGame(); // Removido! Agora chamamos o menu:
     startScreen.style.display = "flex";
 </script>
 </body>

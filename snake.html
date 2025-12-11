@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Snake Ajustado</title>
+    <style>
+        body {
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            background-color: #2b2b2b;
+            margin: 0;
+            color: white;
+            font-family: Arial, sans-serif;
+            touch-action: manipulation;
+            overflow: hidden;
+        }
+        
+        h1 { margin: 10px 0; font-size: 24px; }
+
+        .game-container {
+            position: relative;
+            /* Tamanho fixo da lógica */
+            width: 500px;
+            height: 500px;
+            
+            /* Ajuste visual */
+            max-width: 95vw;
+            max-height: 95vw;
+            
+            /* A borda agora fica FORA do tamanho da caixa (outline) para não espremer o jogo */
+            outline: 4px solid #4CAF50; 
+            background-color: #000;
+            box-shadow: 0px 0px 30px rgba(0,0,0,0.6);
+        }
+        
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* --- MENU --- */
+        #startScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+        }
+
+        #btnStart {
+            padding: 20px 50px;
+            font-size: 24px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            text-transform: uppercase;
+            font-weight: bold;
+            box-shadow: 0 4px 0 #2e7d32;
+        }
+        #btnStart:active { transform: translateY(2px); box-shadow: none; }
+
+        .score-display {
+            font-size: 30px;
+            margin-bottom: 25px;
+            color: #fff;
+            display: none; 
+            font-weight: bold;
+        }
+
+        #speedIndicator {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: yellow;
+            font-weight: bold;
+            font-size: 16px;
+            z-index: 5;
+            background: rgba(0,0,0,0.5);
+            padding: 5px 10px;
+            border-radius: 5px;
+        }
+
+        /* Controles */
+        .controls {
+            display: none;
+            margin-top: 25px; /* Mais espaço para não colar na borda */
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+        .row { display: flex; gap: 10px; }
+
+        button.d-pad {
+            width: 70px;
+            height: 70px;
+            background-color: #444;
+            color: white;
+            border: none;
+            border-radius: 15px;
+            font-size: 30px;
+            cursor: pointer;
+            touch-action: manipulation;
+            box-shadow: 0 4px 0 #222;
+        }
+        button.d-pad:active { background-color: #4CAF50; transform: translateY(4px); box-shadow: none; }
+
+        @media (max-width: 800px) { .controls { display: flex; } }
+    </style>
+</head>
+<body>
+
+    <h1>Snake Game</h1>
+
+    <div class="game-container">
+        <canvas id="gameCanvas" width="500" height="500"></canvas>
+        <div id="speedIndicator">Nível: 1</div>
+
+        <div id="startScreen">
+            <div id="finalScore" class="score-display">Score: 0</div>
+            <button id="btnStart">JOGAR</button>
+        </div>
+    </div>
+    
+    <div class="controls">
+        <button class="d-pad" id="btnUp">⬆️</button>
+        <div class="row">
+            <button class="d-pad" id="btnLeft">⬅️</button>
+            <button class="d-pad" id="btnRight">➡️</button>
+        </div>
+        <button class="d-pad" id="btnDown">⬇️</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        const startScreen = document.getElementById("startScreen");
+        const btnStart = document.getElementById("btnStart");
+        const finalScoreText = document.getElementById("finalScore");
+        const speedIndicator = document.getElementById("speedIndicator");
+
+        const box = 25; 
+        const canvasSize = 500; 
+        
+        const startSpeed = 150; 
+        const speedStep = 10;   
+        const maxSpeed = 50;    
+        
+        let currentSpeed = startSpeed;
+        let snake = [];
+        let direction = "RIGHT";
+        let nextDirection = "RIGHT";
+        let food = {};
+        let score = 0;
+        let gameLoop = null;
+        let level = 1;
+
+        btnStart.addEventListener("click", startGame);
+
+        document.getElementById("btnUp").onclick = () => move('UP');
+        document.getElementById("btnDown").onclick = () => move('DOWN');
+        document.getElementById("btnLeft").onclick = () => move('LEFT');
+        document.getElementById("btnRight").onclick = () => move('RIGHT');
+
+        function startGame() {
+            startScreen.style.display = "none";
+            
+            snake = [];
+            snake[0] = { x: 10 * box, y: 10 * box };
+            
+            direction = "RIGHT";
+            nextDirection = "RIGHT";
+            score = 0;
+            level = 1;
+            currentSpeed = startSpeed;
+            updateLevelDisplay();
+            
+            createFood();
+
+            if(gameLoop) clearInterval(gameLoop);
+            gameLoop = setInterval(draw, currentSpeed);
+        }
+
+        function createFood() {
+            food = {
+                x: Math.floor(Math.random() * (canvasSize/box)) * box,
+                y: Math.floor(Math.random() * (canvasSize/box)) * box
+            };
+        }
+
+        function updateLevelDisplay() {
+            speedIndicator.innerText = "Nível: " + level;
+        }
+
+        function increaseSpeed() {
+            if (currentSpeed > maxSpeed) {
+                currentSpeed -= speedStep; 
+                level++;
+                updateLevelDisplay();
+                clearInterval(gameLoop);
+                gameLoop = setInterval(draw, currentSpeed);
+            }
+        }
+
+        function gameOver() {
+            clearInterval(gameLoop); 
+            startScreen.style.display = "flex"; 
+            finalScoreText.innerText = "Fim! Pontos: " + score;
+            finalScoreText.style.display = "block";
+            btnStart.innerText = "TENTAR NOVAMENTE";
+        }
+
+        document.addEventListener("keydown", (event) => {
+            if(event.keyCode == 37) move('LEFT');
+            if(event.keyCode == 38) move('UP');
+            if(event.keyCode == 39) move('RIGHT');
+            if(event.keyCode == 40) move('DOWN');
+            if(event.keyCode == 13 && startScreen.style.display !== "none") startGame();
+        });
+
+        function move(dir) {
+            if(dir == "LEFT" && direction != "RIGHT") nextDirection = "LEFT";
+            if(dir == "UP" && direction != "DOWN") nextDirection = "UP";
+            if(dir == "RIGHT" && direction != "LEFT") nextDirection = "RIGHT";
+            if(dir == "DOWN" && direction != "UP") nextDirection = "DOWN";
+        }
+
+        function draw() {
+            direction = nextDirection;
+
+            // Fundo
+            ctx.fillStyle = "#111"; 
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Comida
+            ctx.fillStyle = "#ff3333";
+            ctx.fillRect(food.x, food.y, box, box);
+            
+            // Cobra
+            for(let i = 0; i < snake.length; i++) {
+                ctx.fillStyle = (i == 0) ? "#4CAF50" : "#FFFFFF"; 
+                ctx.fillRect(snake[i].x, snake[i].y, box, box);
+                
+                // MUDANÇA AQUI:
+                // Agora a borda é verde escura, não preta. 
+                // Isso faz você ver exatamente onde a cobra termina.
+                ctx.strokeStyle = "#2E7D32"; 
+                ctx.lineWidth = 1; // Borda mais fina
+                ctx.strokeRect(snake[i].x, snake[i].y, box, box);
+            }
+
+            let snakeX = snake[0].x;
+            let snakeY = snake[0].y;
+
+            if(direction == "LEFT") snakeX -= box;
+            if(direction == "UP") snakeY -= box;
+            if(direction == "RIGHT") snakeX += box;
+            if(direction == "DOWN") snakeY += box;
+
+            if(snakeX == food.x && snakeY == food.y) {
+                score++;
+                if (score > 0 && score % 10 === 0) increaseSpeed(); 
+                createFood();
+            } else {
+                snake.pop();
+            }
+
+            let newHead = { x: snakeX, y: snakeY };
+
+            // Verificação de Colisão
+            if(snakeX < 0 || snakeX >= canvas.width || 
+               snakeY < 0 || snakeY >= canvas.height || 
+               collision(newHead, snake)) {
+                gameOver(); 
+                return;
+            }
+
+            snake.unshift(newHead);
+        }
+
+        function collision(head, array) {
+            for(let i = 0; i < array.length; i++) {
+                if(head.x == array[i].x && head.y == array[i].y) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    </script>
+</body>
+</html>

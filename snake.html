@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Snake Smooth</title>
+    <title>Snake Game</title>
     <style>
         body {
             min-height: 100vh;
@@ -21,18 +21,6 @@
         }
         
         h1 { margin: 5px 0; font-size: 20px; }
-
-        #digitalClock {
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 16px;
-            color: #4CAF50;
-            background-color: #000;
-            padding: 4px 12px;
-            border-radius: 5px;
-            border: 1px solid #333;
-            margin-bottom: 10px;
-            text-align: center;
-        }
 
         .game-container {
             position: relative;
@@ -129,7 +117,6 @@
 <body>
 
     <h1>Snake Game</h1>
-    <div id="digitalClock">--:--:--</div>
 
     <div class="game-container">
         <canvas id="gameCanvas" width="500" height="500"></canvas>
@@ -188,14 +175,6 @@
             }
         }
 
-        // --- RELÓGIO ---
-        function updateClock() {
-            const now = new Date();
-            document.getElementById('digitalClock').innerText = now.toLocaleTimeString('pt-BR');
-        }
-        setInterval(updateClock, 1000);
-        updateClock();
-
         // --- LÓGICA DO JOGO ---
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
@@ -249,33 +228,25 @@
             score = 0;
             level = 1;
             currentSpeed = startSpeed;
-            lastRenderTime = 0; // Reseta o tempo
+            lastRenderTime = 0; 
             
             updateLevelDisplay();
             createFood();
 
-            // Cancela loop anterior se houver
             if(animationFrameId) cancelAnimationFrame(animationFrameId);
-            
-            // Inicia o novo loop
             window.requestAnimationFrame(gameLoop);
         }
 
-        // --- O NOVO CORAÇÃO DO JOGO (GAME LOOP) ---
+        // GAME LOOP (requestAnimationFrame)
         function gameLoop(currentTime) {
-            if(isGameOver) return; // Para se morreu
+            if(isGameOver) return; 
 
-            // Solicita o próximo quadro imediatamente (para manter 60fps)
             window.requestAnimationFrame(gameLoop);
 
-            // Calcula quanto tempo passou desde a última vez que a cobra andou
             const secondsSinceLastRender = (currentTime - lastRenderTime) / 1000;
 
-            // Se ainda não passou o tempo da velocidade atual, não faz nada
-            // (Isso controla a velocidade da cobra)
             if (secondsSinceLastRender < currentSpeed / 1000) return;
 
-            // Se passou o tempo, atualiza!
             lastRenderTime = currentTime;
             update();
             draw();
@@ -297,12 +268,11 @@
                 currentSpeed -= speedStep; 
                 level++;
                 updateLevelDisplay();
-                // Não precisamos mais dar clearInterval, o gameLoop pega o novo currentSpeed sozinho!
             }
         }
 
         function gameOver() {
-            isGameOver = true; // Para o loop
+            isGameOver = true; 
             playSound('die'); 
             
             if (score > highScore) {
@@ -320,7 +290,6 @@
             btnStart.innerText = "JOGAR NOVAMENTE";
         }
 
-        // Input com proteção contra virada rápida
         document.addEventListener("keydown", (event) => {
             if(event.keyCode == 37) setDirection('LEFT');
             if(event.keyCode == 38) setDirection('UP');
@@ -330,14 +299,12 @@
         });
 
         function setDirection(newDir) {
-            // Evita virar para a direção oposta instantaneamente
             if(newDir == "LEFT" && direction != "RIGHT") nextDirection = "LEFT";
             if(newDir == "UP" && direction != "DOWN") nextDirection = "UP";
             if(newDir == "RIGHT" && direction != "LEFT") nextDirection = "RIGHT";
             if(newDir == "DOWN" && direction != "UP") nextDirection = "DOWN";
         }
 
-        // Separei a lógica (update) do desenho (draw)
         function update() {
             direction = nextDirection;
 
@@ -371,15 +338,12 @@
         }
 
         function draw() {
-            // Fundo
             ctx.fillStyle = "#111"; 
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Comida
             ctx.fillStyle = "#ff3333";
             ctx.fillRect(food.x, food.y, box, box);
             
-            // Cobra
             for(let i = 0; i < snake.length; i++) {
                 ctx.fillStyle = (i == 0) ? "#4CAF50" : "#FFFFFF"; 
                 ctx.fillRect(snake[i].x, snake[i].y, box, box);

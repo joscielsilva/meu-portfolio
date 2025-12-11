@@ -17,7 +17,7 @@
             padding: 10px 0;
         }
         
-        /* Container do Jogo (para posicionar o menu) */
+        /* Container do Jogo (Onde a mágica acontece) */
         .game-container {
             position: relative;
             width: 800px;
@@ -35,39 +35,15 @@
             height: 100%;
         }
         
-        /* --- MENU DE INÍCIO / GAME OVER --- */
-        #startScreen {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.9);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 20;
-        }
-
-        #btnStart {
-            padding: 15px 40px;
-            font-size: 20px;
-            background-color: #3498db;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            text-transform: uppercase;
+        /* O score será exibido diretamente no HUD durante o jogo */
+        .score-info { 
+            position: absolute; 
+            top: 10px; 
+            left: 10px; 
+            color: black; 
             font-weight: bold;
-            box-shadow: 0 4px 0 #21618c;
-            margin-top: 15px;
+            z-index: 10;
         }
-        #btnStart:active { transform: translateY(2px); box-shadow: none; }
-
-        .score-info { text-align: center; color: #fff; margin-bottom: 20px; }
-        .big-text { font-size: 30px; font-weight: bold; color: #f1c40f; }
-        .small-text { font-size: 18px; color: #ccc; }
 
         /* --- CONTROLES MOBILE --- */
         .controls {
@@ -101,14 +77,11 @@
 <div class="game-container">
     <canvas id="gameCanvas" width="800" height="400"></canvas>
     
-    <div id="startScreen">
-        <div class="score-info">
-            <div id="finalScoreText" class="big-text" style="display:none;">FIM DE JOGO</div>
-            <div class="small-text">RECORDE ATUAL</div>
-            <div id="highScoreDisplay" class="big-text">0</div>
-        </div>
-        <button id="btnStart">JOGAR</button>
+    <div class="score-info">
+        Score: <span id="currentScore">0</span><br>
+        Recorde: <span id="highScoreDisplay">0</span>
     </div>
+
 </div>
 
 <div class="controls">
@@ -122,11 +95,9 @@
 <script>
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
-    const startScreen = document.getElementById("startScreen");
-    const btnStart = document.getElementById("btnStart");
+    const currentScoreDisplay = document.getElementById("currentScore");
     const highScoreDisplay = document.getElementById("highScoreDisplay");
-    const finalScoreText = document.getElementById("finalScoreText");
-
+    
     // --- 1. SISTEMA DE ÁUDIO ---
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     const audioCtx = new AudioContext();
@@ -156,15 +127,14 @@
         }
     }
 
-
     // --- 2. CONFIGURAÇÕES E VARIÁVEIS ---
     const gravity = 0.6;
     const friction = 0.85; 
     
     let cameraX = 0;
     let score = 0;
-    let isGameOver = true; 
-    let lastTime = 0; // Para requestAnimationFrame
+    let isGameOver = false; // Começa como false para iniciar o jogo
+    let lastTime = 0;
 
     const player = {
         x: 50,
@@ -174,8 +144,7 @@
         speed: 6,
         dx: 0, 
         dy: 0, 
-        jumping: true, 
-        wasOnGround: false, // Usado para tocar o som de pouso
+        jumping: false, 
         color: "red"
     };
 
@@ -189,9 +158,7 @@
 
     const keys = { right: false, left: false, jump: false };
 
-    // --- 3. INICIALIZAÇÃO E MENUS ---
-    btnStart.addEventListener("click", initGame);
-
+    // --- 3. INICIALIZAÇÃO (AGORA RODA SEM BOTÃO) ---
     function initGame() {
         if (audioCtx.state === 'suspended') audioCtx.resume();
         
@@ -203,23 +170,20 @@
         // Cria o chão inicial
         createPlatform(0, 350, 800, 50, false);
         
-        // Pousa o jogador na primeira plataforma criada
+        // POSICIONAMENTO CRÍTICO (Estabilidade na plataforma)
         player.x = 50;
         player.y = platforms[0].y - player.height; 
         player.dx = 0;
         player.dy = 0;
         player.jumping = false; 
-        player.wasOnGround = true; // Força como se estivesse no chão para não cair
         
         cameraX = 0;
         score = 0;
         isGameOver = false;
         lastTime = 0; 
+        currentScoreDisplay.innerText = score;
 
-        // Esconde Menu
-        startScreen.style.display = "none";
-        
-        // Inicia o loop de alta performance
+        // Limpa o loop anterior e inicia um novo
         requestAnimationFrame(gameLoop);
     }
     
@@ -227,20 +191,20 @@
         isGameOver = true;
         playSound('die');
 
+        // Exibir Game Over no HUD temporariamente
+        currentScoreDisplay.innerText = "GAME OVER! Pontos: " + score;
+        
         // Salva e exibe Recorde
         if (score > highScore) {
             highScore = score;
             localStorage.setItem('platformHighScore', highScore);
             highScoreDisplay.innerText = highScore + " (NOVO!)";
-        } else {
-            highScoreDisplay.innerText = highScore;
         }
 
-        finalScoreText.innerText = "FIM! PONTOS: " + score;
-        finalScoreText.style.display = "block";
-        
-        startScreen.style.display = "flex"; 
-        btnStart.innerText = "JOGAR NOVAMENTE";
+        // Aguarda 3 segundos e reinicia o jogo
+        setTimeout(() => {
+            initGame();
+        }, 3000); 
     }
 
     // --- 4. GAME LOOP (Fluidez) ---
@@ -266,7 +230,8 @@
         if (keys.right) player.dx = player.speed;
         if (keys.left) player.dx = -player.speed;
         
-        // Pulo e Som
+        let wasJumping = player.jumping; 
+
         if (keys.jump && !player.jumping) {
             player.jumping = true;
             player.dy = -12; 
@@ -283,47 +248,39 @@
 
         // 5c. Colisão com o Chão/Plataformas
         let onGround = false;
-        let landingNow = false;
-        let originalY = player.y; // Posição Y antes de verificar colisão
 
         for (let plat of platforms) {
-            // Teste de Colisão (simples AABB)
+            
             if (player.x < plat.x + plat.w &&
                 player.x + player.width > plat.x &&
                 player.y < plat.y + plat.h &&
                 player.y + player.height > plat.y) {
                 
                 // Colisão por cima (Pouso)
-                // Se estava se movendo para baixo (player.dy > 0) E
-                // a posição anterior Y estava acima da plataforma:
-                if (player.dy > 0 && originalY + player.height <= plat.y) {
+                if (player.dy > 0 && player.y + player.height - player.dy <= plat.y) {
                     
-                    // Verifica se estava pulando antes para saber se tocou no chão
-                    if (player.jumping) landingNow = true;
+                    if (wasJumping) playSound('land');
                     
                     player.jumping = false;
                     player.dy = 0;
-                    // Força a posição para o topo exato da plataforma
+                    // FIXO: Garante que a posição Y não afunde
                     player.y = plat.y - player.height; 
                     onGround = true;
                 }
             }
         }
         
-        // Toca som se acabou de pousar
-        if (landingNow) {
-            playSound('land');
+        // Se não estiver no chão (cair do buraco), volte a pular (para que a gravidade funcione)
+        if (!onGround) {
+            player.jumping = true; 
         }
 
-        // 5d. Colisão com Inimigos (Morte ou Rebote)
-        // (Lógica de inimigos deve ser adicionada aqui, mas mantida omitida por enquanto para foco na colisão principal)
-        
-        // 5e. Morte (Cair no buraco)
+        // 5d. Morte (Cair no buraco)
         if (player.y > canvas.height) {
             gameOver();
         }
 
-        // 5f. Câmera e Geração de Mundo
+        // 5e. Câmera e Geração de Mundo
         if (player.x > cameraX + 200) {
             cameraX = player.x - 200;
         }
@@ -336,7 +293,6 @@
 
     function createPlatform(x, y, w, h, canSpawnEnemy) {
         platforms.push({ x, y, w, h });
-        // Lógica de inimigo (não adicionada para esta correção)
     }
 
     function generateWorld() {
@@ -362,6 +318,7 @@
         if (platforms.length > 0 && platforms[0].x + platforms[0].w < cameraX - 100) {
             platforms.shift();
             score++; 
+            currentScoreDisplay.innerText = score;
         }
     }
 
@@ -386,11 +343,6 @@
         ctx.fillRect(player.x, player.y, player.width, player.height);
 
         ctx.restore();
-
-        // HUD (Score)
-        ctx.fillStyle = "black";
-        ctx.font = "20px Arial";
-        ctx.fillText(`Score: ${score}`, 20, 30);
     }
 
     // --- 8. CONTROLES E LISTENERS ---
@@ -400,9 +352,6 @@
         if (e.code === "Space" || e.code === "ArrowUp") {
             keys.jump = true;
             e.preventDefault();
-        }
-        if (e.code === "Enter" && isGameOver) {
-            initGame();
         }
     });
 
@@ -422,8 +371,8 @@
     document.getElementById("btnJump").ontouchstart = (e) => { e.preventDefault(); keys.jump = true; };
     document.getElementById("btnJump").ontouchend = () => keys.jump = false;
     
-    // Mostra o Menu no carregamento inicial
-    startScreen.style.display = "flex";
+    // Inicia o Jogo Imediatamente
+    initGame();
 </script>
 </body>
 </html>

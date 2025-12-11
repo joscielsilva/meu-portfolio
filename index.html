@@ -92,7 +92,7 @@
 <body>
 
     <header>
-        <h1 id="meuNome">Olá, eu sou o Desenvolvedor!</h1>
+        <h1 id="meuNome">Olá, Me chamo Josciel!</h1>
         <p>Iniciante em Programação & Criador de Jogos</p>
         
         <div id="relogio-container">
@@ -108,6 +108,7 @@
             <p>
                 Estou aprendendo desenvolvimento web e criação de jogos. 
                 Gosto de transformar ideias em códigos e resolver problemas lógicos.
+		Gosto muito de tudo relacionado á Tecnologia da informação.
             </p>
         </section>
 
@@ -115,7 +116,7 @@
             <h2>Meus Projetos</h2>
             
             <div class="projeto-item">
-                <h3>🎮 Super Plataforma</h3>
+                <h3>🎮 Super Plataforma <span style="color: red;">(em desenvolvimento)</span></h3>
                 <p>Um jogo estilo Mario feito inteiramente em JavaScript com física e inimigos.</p>
                 <a href="plataforma_infinita.html" class="btn" target="_blank">Jogar Agora</a>
             </div>
@@ -132,34 +133,27 @@
         <section id="contato">
             <h2>Entre em Contato</h2>
             <p>Quer falar sobre um projeto? Me mande uma mensagem.</p>
-            <button class="btn" onclick="alert('exemplo@email.com')">Ver Email</button>
+            <button class="btn" onclick="alert('joscielsilva26@gmail.com')">Ver Email</button>
         </section>
 
     </div>
 
     <footer>
-        <p>Desenvolvido em 2024</p>
+        <p>Desenvolvido em 2025, by Zag</p>
     </footer>
 
     <script>
         function atualizarRelogioSite() {
             const agora = new Date();
             
-            // Pega a data formatada (ex: 11/12/2025)
             const dataFormatada = agora.toLocaleDateString('pt-BR');
-            
-            // Pega a hora formatada (ex: 09:18:42)
             const horaFormatada = agora.toLocaleTimeString('pt-BR');
 
-            // Coloca no HTML
             document.getElementById('data-atual').innerText = dataFormatada;
             document.getElementById('hora-atual').innerText = horaFormatada;
         }
 
-        // Atualiza a cada 1 segundo (1000 milissegundos)
         setInterval(atualizarRelogioSite, 1000);
-        
-        // Chama a primeira vez imediatamente para não ficar vazio
         atualizarRelogioSite();
     </script>
 

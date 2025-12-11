@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Snake Game</title>
+    <title>Snake Moderno</title>
     <style>
         body {
             min-height: 100vh;
@@ -11,16 +11,16 @@
             justify-content: center;
             align-items: center;
             flex-direction: column;
-            background-color: #2b2b2b;
+            background-color: #2c3e50; /* Fundo da página: Azul Petróleo */
             margin: 0;
             color: white;
-            font-family: Arial, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             touch-action: manipulation;
             padding: 10px 0;
             user-select: none;
         }
         
-        h1 { margin: 5px 0; font-size: 20px; }
+        h1 { margin: 5px 0; font-size: 24px; text-shadow: 2px 2px #000; }
 
         .game-container {
             position: relative;
@@ -29,9 +29,12 @@
             max-width: 90vw;
             max-height: 55vh; 
             aspect-ratio: 1 / 1;
-            outline: 4px solid #4CAF50; 
-            background-color: #000;
-            box-shadow: 0px 0px 30px rgba(0,0,0,0.6);
+            /* Borda bonita e arredondada */
+            border-radius: 15px;
+            box-shadow: 0px 10px 30px rgba(0,0,0,0.5);
+            background-color: #34495e; /* Fundo do jogo: Azul um pouco mais claro */
+            overflow: hidden;
+            border: 4px solid #ecf0f1;
         }
         
         canvas {
@@ -47,69 +50,69 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.92);
+            background-color: rgba(44, 62, 80, 0.9); /* Azul escuro transparente */
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             z-index: 20;
+            border-radius: 10px;
         }
 
         #btnStart {
             padding: 15px 40px;
             font-size: 20px;
-            background-color: #4CAF50;
+            background-color: #2ecc71; /* Verde Esmeralda */
             color: white;
             border: none;
-            border-radius: 8px;
+            border-radius: 50px; /* Botão redondo */
             cursor: pointer;
             text-transform: uppercase;
             font-weight: bold;
-            box-shadow: 0 4px 0 #2e7d32;
+            box-shadow: 0 4px 0 #27ae60;
             margin-top: 15px;
+            transition: transform 0.1s;
         }
         #btnStart:active { transform: translateY(2px); box-shadow: none; }
 
         .score-info { text-align: center; color: #fff; margin-bottom: 10px; }
-        .big-text { font-size: 24px; font-weight: bold; color: #ffeb3b; }
-        .small-text { font-size: 16px; color: #ccc; }
+        .big-text { font-size: 24px; font-weight: bold; color: #f1c40f; }
+        .small-text { font-size: 16px; color: #bdc3c7; }
 
         #speedIndicator {
             position: absolute;
-            top: 5px;
-            right: 5px;
-            color: yellow;
+            top: 10px;
+            right: 15px;
+            color: #f1c40f;
             font-weight: bold;
-            font-size: 14px;
+            font-size: 16px;
             z-index: 5;
-            background: rgba(0,0,0,0.5);
-            padding: 4px 8px;
-            border-radius: 5px;
+            text-shadow: 1px 1px #000;
         }
 
+        /* CONTROLES */
         .controls {
             display: none;
             margin-top: 15px;
             flex-direction: column;
             align-items: center;
-            gap: 5px;
+            gap: 8px;
         }
-        .row { display: flex; gap: 5px; }
+        .row { display: flex; gap: 8px; }
 
         button.d-pad {
-            width: 60px;
-            height: 60px;
-            background-color: #444;
-            color: white;
+            width: 65px;
+            height: 65px;
+            background-color: #ecf0f1;
+            color: #2c3e50;
             border: none;
-            border-radius: 12px;
-            font-size: 24px;
+            border-radius: 15px;
+            font-size: 30px;
             cursor: pointer;
             touch-action: manipulation;
-            box-shadow: 0 4px 0 #222;
-            -webkit-tap-highlight-color: transparent;
+            box-shadow: 0 4px 0 #bdc3c7;
         }
-        button.d-pad:active { background-color: #4CAF50; transform: translateY(4px); box-shadow: none; }
+        button.d-pad:active { background-color: #bdc3c7; transform: translateY(4px); box-shadow: none; }
 
         @media (max-width: 800px) { .controls { display: flex; } }
     </style>
@@ -125,7 +128,7 @@
         <div id="startScreen">
             <div class="score-info">
                 <div id="finalScoreText" class="big-text" style="display:none;">FIM DE JOGO</div>
-                <div class="small-text">RECORDE ATUAL</div>
+                <div class="small-text">RECORDE</div>
                 <div id="highScoreDisplay" class="big-text">0</div>
             </div>
             <button id="btnStart">JOGAR</button>
@@ -142,23 +145,21 @@
     </div>
 
     <script>
-        // --- SISTEMA DE ÁUDIO ---
+        // --- ÁUDIO ---
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         const audioCtx = new AudioContext();
 
         function playSound(type) {
             if (audioCtx.state === 'suspended') audioCtx.resume();
-
             const oscillator = audioCtx.createOscillator();
             const gainNode = audioCtx.createGain();
-
             oscillator.connect(gainNode);
             gainNode.connect(audioCtx.destination);
 
             if (type === 'eat') {
-                oscillator.type = 'square';
+                oscillator.type = 'sine'; // Som mais suave (Seno)
                 oscillator.frequency.setValueAtTime(600, audioCtx.currentTime);
-                oscillator.frequency.exponentialRampToValueAtTime(1000, audioCtx.currentTime + 0.1);
+                oscillator.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.1);
                 gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
                 gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
                 oscillator.start();
@@ -166,16 +167,16 @@
             } 
             else if (type === 'die') {
                 oscillator.type = 'sawtooth';
-                oscillator.frequency.setValueAtTime(200, audioCtx.currentTime);
-                oscillator.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.5);
+                oscillator.frequency.setValueAtTime(150, audioCtx.currentTime);
+                oscillator.frequency.linearRampToValueAtTime(50, audioCtx.currentTime + 0.3);
                 gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
-                gainNode.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+                gainNode.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
                 oscillator.start();
-                oscillator.stop(audioCtx.currentTime + 0.5);
+                oscillator.stop(audioCtx.currentTime + 0.3);
             }
         }
 
-        // --- LÓGICA DO JOGO ---
+        // --- LÓGICA ---
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
         const startScreen = document.getElementById("startScreen");
@@ -187,7 +188,6 @@
         const box = 25; 
         const canvasSize = 500; 
         
-        // Configurações de Velocidade
         const startSpeed = 150; 
         const speedStep = 10;   
         const maxSpeed = 50;    
@@ -200,7 +200,6 @@
         let score = 0;
         let level = 1;
         
-        // Variáveis do Novo Loop
         let animationFrameId;
         let lastRenderTime = 0;
         let isGameOver = false;
@@ -237,14 +236,12 @@
             window.requestAnimationFrame(gameLoop);
         }
 
-        // GAME LOOP (requestAnimationFrame)
+        // LOOP
         function gameLoop(currentTime) {
             if(isGameOver) return; 
-
             window.requestAnimationFrame(gameLoop);
-
+            
             const secondsSinceLastRender = (currentTime - lastRenderTime) / 1000;
-
             if (secondsSinceLastRender < currentSpeed / 1000) return;
 
             lastRenderTime = currentTime;
@@ -307,7 +304,6 @@
 
         function update() {
             direction = nextDirection;
-
             let snakeX = snake[0].x;
             let snakeY = snake[0].y;
 
@@ -333,23 +329,79 @@
                 gameOver(); 
                 return;
             }
-
             snake.unshift(newHead);
         }
 
+        // --- FUNÇÃO DE DESENHO (DRAW) MODERNA ---
         function draw() {
-            ctx.fillStyle = "#111"; 
+            // Fundo (Limpa e Pinta)
+            ctx.fillStyle = "#34495e"; 
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            ctx.fillStyle = "#ff3333";
-            ctx.fillRect(food.x, food.y, box, box);
+            // 1. DESENHA A COMIDA (MAÇÃ)
+            // Em vez de quadrado, desenha um círculo
+            let foodCenterX = food.x + box/2;
+            let foodCenterY = food.y + box/2;
+            let radius = box/2 - 2;
+
+            ctx.beginPath();
+            ctx.arc(foodCenterX, foodCenterY, radius, 0, 2 * Math.PI);
+            ctx.fillStyle = "#e74c3c"; // Vermelho bonito
+            ctx.fill();
             
+            // Folhinha da maçã (detalhe)
+            ctx.fillStyle = "#2ecc71";
+            ctx.fillRect(foodCenterX - 2, food.y + 2, 4, 6);
+
+
+            // 2. DESENHA A COBRA
             for(let i = 0; i < snake.length; i++) {
-                ctx.fillStyle = (i == 0) ? "#4CAF50" : "#FFFFFF"; 
-                ctx.fillRect(snake[i].x, snake[i].y, box, box);
-                ctx.strokeStyle = "#2E7D32"; 
-                ctx.lineWidth = 1; 
-                ctx.strokeRect(snake[i].x, snake[i].y, box, box);
+                
+                // Cabeça tem uma cor, corpo tem outra
+                // Corpo alterna entre verde claro e verde médio
+                ctx.fillStyle = (i == 0) ? "#2ecc71" : (i % 2 == 0 ? "#27ae60" : "#229954");
+                
+                // Desenha quadrado arredondado (simulado com arco nos cantos ou círculo interno)
+                // Para simplificar e ficar bonito, vamos desenhar quadrados com bordas arredondadas:
+                let x = snake[i].x;
+                let y = snake[i].y;
+                let s = box; // tamanho
+
+                // Preenchimento
+                ctx.fillRect(x + 1, y + 1, s - 2, s - 2);
+                
+                // --- DETALHE DA CABEÇA (OLHOS) ---
+                if (i == 0) {
+                    ctx.fillStyle = "white"; // Branco do olho
+                    
+                    // Posição dos olhos depende da direção
+                    let eyeOffsetX1, eyeOffsetY1, eyeOffsetX2, eyeOffsetY2;
+                    
+                    // Configura posição baseada na direção
+                    if (direction == "RIGHT") {
+                        eyeOffsetX1 = s - 8; eyeOffsetY1 = 6;
+                        eyeOffsetX2 = s - 8; eyeOffsetY2 = s - 10;
+                    } else if (direction == "LEFT") {
+                        eyeOffsetX1 = 4; eyeOffsetY1 = 6;
+                        eyeOffsetX2 = 4; eyeOffsetY2 = s - 10;
+                    } else if (direction == "UP") {
+                        eyeOffsetX1 = 6; eyeOffsetY1 = 4;
+                        eyeOffsetX2 = s - 10; eyeOffsetY2 = 4;
+                    } else { // DOWN
+                        eyeOffsetX1 = 6; eyeOffsetY1 = s - 8;
+                        eyeOffsetX2 = s - 10; eyeOffsetY2 = s - 8;
+                    }
+
+                    // Olho 1
+                    ctx.fillRect(x + eyeOffsetX1, y + eyeOffsetY1, 4, 4);
+                    // Olho 2
+                    ctx.fillRect(x + eyeOffsetX2, y + eyeOffsetY2, 4, 4);
+                    
+                    // Pupila preta
+                    ctx.fillStyle = "black"; 
+                    ctx.fillRect(x + eyeOffsetX1 + 1, y + eyeOffsetY1 + 1, 2, 2);
+                    ctx.fillRect(x + eyeOffsetX2 + 1, y + eyeOffsetY2 + 1, 2, 2);
+                }
             }
         }
 

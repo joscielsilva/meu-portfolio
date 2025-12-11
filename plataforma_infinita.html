@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Plataforma Estável e Fluida</title>
+    <title>Plataforma Completa</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
         body {
@@ -15,9 +15,9 @@
             flex-direction: column;
             user-select: none;
             padding: 10px 0;
+            font-family: Arial, sans-serif;
         }
         
-        /* Container do Jogo (Onde a mágica acontece) */
         .game-container {
             position: relative;
             width: 800px;
@@ -26,16 +26,52 @@
             max-height: 55vh; 
             outline: 4px solid #fff;
             box-shadow: 0px 0px 20px rgba(0,0,0,0.5);
+            overflow: hidden; /* Garante que o menu não vaze */
         }
 
         canvas {
-            background-color: #87CEEB; /* Cor do céu */
+            background-color: #87CEEB; 
             display: block;
             width: 100%;
             height: 100%;
         }
         
-        /* O score será exibido diretamente no HUD durante o jogo */
+        /* --- MENU DE INÍCIO / GAME OVER --- */
+        #startScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.85); /* Fundo escuro transparente */
+            display: flex; /* Começa visível */
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            color: white;
+        }
+
+        #btnStart {
+            padding: 15px 40px;
+            font-size: 20px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            text-transform: uppercase;
+            font-weight: bold;
+            box-shadow: 0 4px 0 #21618c;
+            margin-top: 20px;
+            transition: transform 0.1s;
+        }
+        #btnStart:active { transform: translateY(2px); box-shadow: none; }
+
+        .big-text { font-size: 32px; font-weight: bold; color: #f1c40f; margin-bottom: 10px; }
+        .small-text { font-size: 18px; color: #ccc; }
+
+        /* HUD durante o jogo */
         .score-info { 
             position: absolute; 
             top: 10px; 
@@ -72,7 +108,7 @@
 </head>
 <body>
 
-<h1>Protótipo de Plataforma</h1>
+<h1>Super Plataforma</h1>
 
 <div class="game-container">
     <canvas id="gameCanvas" width="800" height="400"></canvas>
@@ -80,6 +116,13 @@
     <div class="score-info">
         Score: <span id="currentScore">0</span><br>
         Recorde: <span id="highScoreDisplay">0</span>
+    </div>
+
+    <div id="startScreen">
+        <div id="menuTitle" class="big-text">SUPER PLATAFORMA</div>
+        <div class="small-text">Recorde Atual: <span id="menuHighScore">0</span></div>
+        <div id="finalScoreText" style="display:none; color: #ff6b6b; margin-top:10px; font-weight:bold;"></div>
+        <button id="btnStart">INICIAR</button>
     </div>
 
 </div>
@@ -95,6 +138,13 @@
 <script>
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
+    
+    // Elementos do DOM
+    const startScreen = document.getElementById("startScreen");
+    const btnStart = document.getElementById("btnStart");
+    const menuTitle = document.getElementById("menuTitle");
+    const menuHighScore = document.getElementById("menuHighScore");
+    const finalScoreText = document.getElementById("finalScoreText");
     const currentScoreDisplay = document.getElementById("currentScore");
     const highScoreDisplay = document.getElementById("highScoreDisplay");
     
@@ -119,7 +169,6 @@
         } else if (type === 'die') {
             oscillator.type = 'sawtooth';
             oscillator.frequency.setValueAtTime(200, audioCtx.currentTime);
-            oscillator.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.5);
             gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
             gainNode.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
             oscillator.start();
@@ -127,14 +176,15 @@
         }
     }
 
-    // --- 2. CONFIGURAÇÕES E VARIÁVEIS ---
+    // --- 2. CONFIGURAÇÕES ---
     const gravity = 0.6;
     const friction = 0.85; 
     
     let cameraX = 0;
     let score = 0;
-    let isGameOver = false; // Começa como false para iniciar o jogo
-    let lastTime = 0;
+    let isGameOver = true; // Começa como TRUE para mostrar o menu
+    let lastTime = 0; 
+    let animationFrameId = null;
 
     const player = {
         x: 50,
@@ -149,74 +199,90 @@
     };
 
     let platforms = [];
-    let enemies = [];
     let lastPlatformX = 0;
     let lastPlatformY = 350;
 
     let highScore = localStorage.getItem('platformHighScore') || 0;
     highScoreDisplay.innerText = highScore;
+    menuHighScore.innerText = highScore;
 
     const keys = { right: false, left: false, jump: false };
 
-    // --- 3. INICIALIZAÇÃO (AGORA RODA SEM BOTÃO) ---
+    // --- 3. INICIALIZAÇÃO E MENUS ---
+    
+    // Configura o botão
+    btnStart.addEventListener("click", () => {
+        initGame();
+    });
+
     function initGame() {
         if (audioCtx.state === 'suspended') audioCtx.resume();
         
+        // Reseta Variáveis
         platforms = [];
-        enemies = [];
         lastPlatformX = 0;
         lastPlatformY = 350;
+        cameraX = 0;
+        score = 0;
+        lastTime = 0; 
 
         // Cria o chão inicial
         createPlatform(0, 350, 800, 50, false);
         
-        // POSICIONAMENTO CRÍTICO (Estabilidade na plataforma)
+        // POSICIONAMENTO FINAL DE ESTABILIDADE
         player.x = 50;
         player.y = platforms[0].y - player.height; 
         player.dx = 0;
         player.dy = 0;
         player.jumping = false; 
         
-        cameraX = 0;
-        score = 0;
-        isGameOver = false;
-        lastTime = 0; 
+        // Atualiza HUD
         currentScoreDisplay.innerText = score;
+        
+        // Esconde Menu e Inicia
+        startScreen.style.display = "none";
+        isGameOver = false;
 
-        // Limpa o loop anterior e inicia um novo
-        requestAnimationFrame(gameLoop);
+        // Inicia o loop
+        if (animationFrameId) cancelAnimationFrame(animationFrameId);
+        animationFrameId = requestAnimationFrame(gameLoop);
     }
     
-    function gameOver() {
+    function showGameOver() {
         isGameOver = true;
         playSound('die');
 
-        // Exibir Game Over no HUD temporariamente
-        currentScoreDisplay.innerText = "GAME OVER! Pontos: " + score;
-        
-        // Salva e exibe Recorde
+        // Atualiza Recorde
         if (score > highScore) {
             highScore = score;
             localStorage.setItem('platformHighScore', highScore);
-            highScoreDisplay.innerText = highScore + " (NOVO!)";
+            highScoreDisplay.innerText = highScore;
+            menuHighScore.innerText = highScore + " (NOVO!)";
+        } else {
+            menuHighScore.innerText = highScore;
         }
 
-        // Aguarda 3 segundos e reinicia o jogo
-        setTimeout(() => {
-            initGame();
-        }, 3000); 
+        // Configura texto do Menu
+        menuTitle.innerText = "GAME OVER";
+        finalScoreText.innerText = "Sua Pontuação: " + score;
+        finalScoreText.style.display = "block";
+        btnStart.innerText = "TENTAR NOVAMENTE";
+        
+        // Mostra o Menu
+        startScreen.style.display = "flex";
     }
 
-    // --- 4. GAME LOOP (Fluidez) ---
+    // --- 4. GAME LOOP ---
     function gameLoop(time) {
         if (isGameOver) return;
         
-        requestAnimationFrame(gameLoop);
+        animationFrameId = requestAnimationFrame(gameLoop);
 
         const dt = time - lastTime;
         lastTime = time;
 
-        const frameAdjust = dt / 16; 
+        // Evita saltos grandes se o jogo travar
+        const frameAdjust = Math.min(dt / 16, 2); 
         
         update(frameAdjust);
         draw();
@@ -226,7 +292,7 @@
     // --- 5. LÓGICA DO JOGO (UPDATE) ---
     function update(frameAdjust) {
         
-        // 5a. Aplicar Controles e Gravidade
+        // Controles
         if (keys.right) player.dx = player.speed;
         if (keys.left) player.dx = -player.speed;
         
@@ -238,49 +304,51 @@
             playSound('jump');
         }
 
-        // Aplica Gravidade e Fricção
+        // Física
         player.dy += gravity * frameAdjust;
         player.dx *= friction; 
 
-        // 5b. Atualizar Posição
         player.x += player.dx * frameAdjust;
         player.y += player.dy * frameAdjust;
 
-        // 5c. Colisão com o Chão/Plataformas
+        // Colisão Robusta
         let onGround = false;
 
         for (let plat of platforms) {
-            
             if (player.x < plat.x + plat.w &&
                 player.x + player.width > plat.x &&
                 player.y < plat.y + plat.h &&
                 player.y + player.height > plat.y) {
                 
-                // Colisão por cima (Pouso)
-                if (player.dy > 0 && player.y + player.height - player.dy <= plat.y) {
+                // Caindo
+                if (player.dy >= 0) { 
+                    player.y = plat.y - player.height; // Corrige posição
                     
                     if (wasJumping) playSound('land');
                     
                     player.jumping = false;
                     player.dy = 0;
-                    // FIXO: Garante que a posição Y não afunde
-                    player.y = plat.y - player.height; 
                     onGround = true;
+                }
+                // Batendo cabeça
+                else if (player.dy < 0) {
+                    player.dy = 0;
+                    player.y = plat.y + plat.h; 
                 }
             }
         }
         
-        // Se não estiver no chão (cair do buraco), volte a pular (para que a gravidade funcione)
         if (!onGround) {
             player.jumping = true; 
         }
 
-        // 5d. Morte (Cair no buraco)
+        // Morte
         if (player.y > canvas.height) {
-            gameOver();
+            showGameOver();
+            return;
         }
 
-        // 5e. Câmera e Geração de Mundo
+        // Câmera
         if (player.x > cameraX + 200) {
             cameraX = player.x - 200;
         }
@@ -289,9 +357,9 @@
         generateWorld();
     }
     
-    // --- 6. GERAÇÃO DE MUNDO E UTILS ---
+    // --- 6. GERAÇÃO DE MUNDO ---
 
-    function createPlatform(x, y, w, h, canSpawnEnemy) {
+    function createPlatform(x, y, w, h) {
         platforms.push({ x, y, w, h });
     }
 
@@ -309,7 +377,7 @@
 
             let newW = Math.floor(Math.random() * 200) + 100;
 
-            createPlatform(lastPlatformX + gap, newY, newW, 40, score > 5);
+            createPlatform(lastPlatformX + gap, newY, newW, 40);
             
             lastPlatformX += gap + newW;
             lastPlatformY = newY;
@@ -333,9 +401,8 @@
         ctx.fillStyle = "#654321";
         for (let plat of platforms) {
             ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
-            ctx.fillStyle = "#32CD32";
+            ctx.fillStyle = "#32CD32"; // Grama
             ctx.fillRect(plat.x, plat.y, plat.w, 5);
-            ctx.fillStyle = "#654321";
         }
 
         // Jogador
@@ -345,13 +412,17 @@
         ctx.restore();
     }
 
-    // --- 8. CONTROLES E LISTENERS ---
+    // --- 8. CONTROLES ---
     document.addEventListener("keydown", (e) => {
         if (e.code === "ArrowRight") keys.right = true;
         if (e.code === "ArrowLeft") keys.left = true;
         if (e.code === "Space" || e.code === "ArrowUp") {
             keys.jump = true;
             e.preventDefault();
+        }
+        // Atalho Enter para reiniciar no Game Over
+        if (e.code === "Enter" && isGameOver) {
+            initGame();
         }
     });
 
@@ -361,7 +432,7 @@
         if (e.code === "Space" || e.code === "ArrowUp") keys.jump = false;
     });
 
-    // Controles Mobile
+    // Mobile
     document.getElementById("btnLeft").ontouchstart = (e) => { e.preventDefault(); keys.left = true; };
     document.getElementById("btnLeft").ontouchend = () => keys.left = false;
     
@@ -371,8 +442,11 @@
     document.getElementById("btnJump").ontouchstart = (e) => { e.preventDefault(); keys.jump = true; };
     document.getElementById("btnJump").ontouchend = () => keys.jump = false;
     
-    // Inicia o Jogo Imediatamente
-    initGame();
+    // Desenha a tela inicial uma vez (sem rodar a física) para não ficar branco
+    // Cria chão fictício para desenho inicial
+    createPlatform(0, 350, 800, 50, false);
+    draw();
+
 </script>
 </body>
 </html>

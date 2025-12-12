@@ -387,4 +387,91 @@
 
         // Balas
         ctx.fillStyle = "#ffff00"; // Amarelo
-        bullets.forEach(b => ctx.fillRect(b.x, b.y, b.w, b
+        bullets.forEach(b => ctx.fillRect(b.x, b.y, b.w, b.h));
+
+        // Inimigos
+        enemies.forEach(e => {
+            if(e.type === 'rock') {
+                ctx.fillStyle = "#888"; // Cinza
+                ctx.fillRect(e.x, e.y, e.w, e.h);
+                // Detalhe pedra
+                ctx.fillStyle = "#555";
+                ctx.fillRect(e.x+5, e.y+5, e.w/2, e.h/2);
+            } else {
+                ctx.fillStyle = "#9933ff"; // Roxo Alien
+                // Desenha alien simples
+                ctx.fillRect(e.x, e.y + e.h/4, e.w, e.h/2); // Corpo
+                ctx.fillRect(e.x + e.w/4, e.y, e.w/2, e.h); // Vertical
+                ctx.fillStyle = "#ff0000"; // Olho
+                ctx.fillRect(e.x + 10, e.y + 10, 5, 5);
+            }
+        });
+
+        // Partículas
+        particles.forEach(p => {
+            ctx.fillStyle = p.color;
+            ctx.fillRect(p.x, p.y, p.size, p.size);
+        });
+    }
+
+    // --- UTILS ---
+    function rectIntersect(r1, r2) {
+        return !(r2.x > r1.x + r1.w || 
+                 r2.x + r2.w < r1.x || 
+                 r2.y > r1.y + r1.h || 
+                 r2.y + r2.h < r1.y);
+    }
+
+    function createExplosion(x, y, count, color) {
+        for(let i=0; i<count; i++) {
+            particles.push({
+                x: x, y: y,
+                vx: (Math.random() - 0.5) * 5,
+                vy: (Math.random() - 0.5) * 5,
+                life: 20 + Math.random() * 10,
+                color: color,
+                size: Math.random() * 3 + 1
+            });
+        }
+    }
+
+    // --- CONTROLES (Teclado) ---
+    document.addEventListener('keydown', e => {
+        if(e.code === 'KeyW' || e.code === 'ArrowUp') keys.w = true;
+        if(e.code === 'KeyS' || e.code === 'ArrowDown') keys.s = true;
+        if(e.code === 'KeyA' || e.code === 'ArrowLeft') keys.a = true;
+        if(e.code === 'KeyD' || e.code === 'ArrowRight') keys.d = true;
+        if(e.code === 'Space') keys.space = true;
+        if(e.code === 'Enter' && isGameOver) initGame();
+    });
+
+    document.addEventListener('keyup', e => {
+        if(e.code === 'KeyW' || e.code === 'ArrowUp') keys.w = false;
+        if(e.code === 'KeyS' || e.code === 'ArrowDown') keys.s = false;
+        if(e.code === 'KeyA' || e.code === 'ArrowLeft') keys.a = false;
+        if(e.code === 'KeyD' || e.code === 'ArrowRight') keys.d = false;
+        if(e.code === 'Space') keys.space = false;
+    });
+
+    // --- CONTROLES (Touch Mobile) ---
+    const addTouch = (id, key) => {
+        const btn = document.getElementById(id);
+        btn.ontouchstart = (e) => { e.preventDefault(); keys[key] = true; };
+        btn.ontouchend = (e) => { e.preventDefault(); keys[key] = false; };
+        // Mouse support para teste no PC
+        btn.onmousedown = (e) => { keys[key] = true; };
+        btn.onmouseup = (e) => { keys[key] = false; };
+    };
+
+    addTouch('btnUp', 'w');
+    addTouch('btnDown', 's');
+    addTouch('btnLeft', 'a');
+    addTouch('btnRight', 'd');
+    addTouch('btnFire', 'space');
+
+    // Desenho Inicial
+    draw();
+
+</script>
+</body>
+</html>

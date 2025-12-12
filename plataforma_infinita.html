@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Plataforma com Personagem</title>
+    <title>Plataforma - Mais Inimigos</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
         body {
@@ -15,7 +15,7 @@
             flex-direction: column;
             user-select: none;
             padding: 10px 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: Arial, sans-serif;
         }
         
         .game-container {
@@ -26,14 +26,15 @@
             max-height: 55vh; 
             outline: 4px solid #fff;
             box-shadow: 0px 0px 20px rgba(0,0,0,0.5);
-            overflow: hidden;
-            background-color: #87CEEB; /* Céu */
+            overflow: hidden; 
+            background-color: #87CEEB; 
         }
 
         canvas {
             display: block;
             width: 100%;
             height: 100%;
+            image-rendering: pixelated; 
         }
         
         /* MENU */
@@ -43,7 +44,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.85);
+            background-color: rgba(0, 0, 0, 0.85); 
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -69,7 +70,7 @@
         #btnStart:active { transform: translateY(2px); box-shadow: none; }
 
         .big-text { font-size: 32px; font-weight: bold; color: #f1c40f; margin-bottom: 10px; text-shadow: 2px 2px #000; }
-        .small-text { font-size: 18px; color: #fff; text-shadow: 1px 1px #000; }
+        .small-text { font-size: 18px; color: #ccc; }
 
         /* HUD */
         .score-info { 
@@ -80,9 +81,7 @@
             font-weight: bold;
             z-index: 10;
             font-size: 18px;
-            background: rgba(255,255,255,0.5);
-            padding: 5px 10px;
-            border-radius: 5px;
+            text-shadow: 1px 1px #fff;
         }
 
         /* CONTROLES MOBILE */
@@ -128,6 +127,7 @@
         <div id="finalScoreText" style="display:none; color: #ff6b6b; margin-top:10px; font-weight:bold;"></div>
         <button id="btnStart">INICIAR</button>
     </div>
+
 </div>
 
 <div class="controls">
@@ -142,7 +142,6 @@
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
     
-    // Elementos DOM
     const startScreen = document.getElementById("startScreen");
     const btnStart = document.getElementById("btnStart");
     const menuTitle = document.getElementById("menuTitle");
@@ -176,12 +175,20 @@
             gainNode.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
             oscillator.start();
             oscillator.stop(audioCtx.currentTime + 0.5);
+        } else if (type === 'kill') {
+            oscillator.type = 'triangle';
+            oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
+            gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + 0.1);
         }
     }
 
-    // --- 2. VARIAVEIS ---
+    // --- 2. CONFIGURAÇÕES ---
     const gravity = 0.6;
-    const friction = 0.85; 
+    const friction = 0.60; 
+    const jumpForce = -13; 
     
     let cameraX = 0;
     let score = 0;
@@ -202,6 +209,7 @@
     };
 
     let platforms = [];
+    let enemies = []; 
     let lastPlatformX = 0;
     let lastPlatformY = 350;
 
@@ -209,7 +217,7 @@
     highScoreDisplay.innerText = highScore;
     menuHighScore.innerText = highScore;
 
-    const keys = { right: false, left: false, jump: false };
+    const keys = { right: false, left: false };
 
     // --- 3. INICIALIZAÇÃO ---
     btnStart.addEventListener("click", () => { initGame(); });
@@ -218,16 +226,15 @@
         if (audioCtx.state === 'suspended') audioCtx.resume();
         
         platforms = [];
+        enemies = [];
         lastPlatformX = 0;
         lastPlatformY = 350;
         cameraX = 0;
         score = 0;
         lastTime = 0; 
 
-        // Chão inicial
-        createPlatform(0, 350, 800, 50);
+        createPlatform(0, 350, 800, 50, false);
         
-        // Posição
         player.x = 50;
         player.y = platforms[0].y - player.height; 
         player.dx = 0;
@@ -283,6 +290,7 @@
     // --- 5. UPDATE ---
     function update(frameAdjust) {
         
+        // Controles Laterais
         if (keys.right) {
             player.dx = player.speed;
             player.facing = 'right'; 
@@ -294,18 +302,14 @@
         
         let wasJumping = player.jumping; 
 
-        if (keys.jump && !player.jumping) {
-            player.jumping = true;
-            player.dy = -12; 
-            playSound('jump');
-        }
-
+        // Gravidade e Fricção
         player.dy += gravity * frameAdjust;
         player.dx *= friction; 
 
         player.x += player.dx * frameAdjust;
         player.y += player.dy * frameAdjust;
 
+        // --- COLISÃO COM PLATAFORMAS ---
         let onGround = false;
         for (let plat of platforms) {
             if (player.x < plat.x + plat.w &&
@@ -327,13 +331,48 @@
             }
         }
         
-        if (!onGround) player.jumping = true; 
+        if (!onGround) {
+            player.jumping = true; 
+        }
 
+        // --- ATUALIZAÇÃO DE INIMIGOS E COLISÃO ---
+        for (let i = enemies.length - 1; i >= 0; i--) {
+            let enemy = enemies[i];
+            
+            enemy.x += enemy.speed * frameAdjust;
+
+            if (enemy.x <= enemy.minX || enemy.x + enemy.width >= enemy.maxX) {
+                enemy.speed *= -1;
+            }
+
+            // Colisão Player vs Inimigo
+            if (player.x < enemy.x + enemy.width - 5 &&
+                player.x + player.width > enemy.x + 5 &&
+                player.y < enemy.y + enemy.height &&
+                player.y + player.height > enemy.y) {
+                
+                // Matar inimigo
+                if (player.dy > 0 && player.y + player.height < enemy.y + enemy.height / 2 + 10) {
+                    enemies.splice(i, 1); 
+                    player.dy = -7; 
+                    playSound('kill');
+                    score += 5; 
+                    currentScoreDisplay.innerText = score;
+                } else {
+                    // Game Over
+                    showGameOver();
+                    return;
+                }
+            }
+        }
+
+        // Morte por queda
         if (player.y > canvas.height) {
             showGameOver();
             return;
         }
 
+        // Câmera
         if (player.x > cameraX + 200) {
             cameraX = player.x - 200;
         }
@@ -342,26 +381,44 @@
         generateWorld();
     }
     
-    // --- 6. MUNDO ---
-    function createPlatform(x, y, w, h) {
+    // --- 6. GERAÇÃO DE MUNDO (MAIS INIMIGOS) ---
+    function createPlatform(x, y, w, h, canSpawnEnemy) {
+        h = Math.ceil(h / 20) * 20;
         platforms.push({ x, y, w, h });
+
+        // AUMENTADO: Spawnar Inimigo
+        // 50% de chance se a plataforma for > 80px
+        if (canSpawnEnemy && w > 80 && Math.random() < 0.5) {
+            enemies.push({
+                x: x + 40,
+                y: y - 32, // Altura do inimigo
+                width: 32,
+                height: 32,
+                speed: 2, 
+                minX: x,
+                maxX: x + w,
+                color: "#8e44ad" // Roxo
+            });
+        }
     }
 
     function generateWorld() {
         while (lastPlatformX < cameraX + canvas.width + 200) {
-            let gap = Math.floor(Math.random() * 90) + 50; 
+            let gap = Math.floor(Math.random() * 90) + 60; 
             
             const maxUp = 100;
             const maxDown = 80;
             let minY = lastPlatformY - maxUp; 
             let maxY = lastPlatformY + maxDown;
-            if (minY < 120) minY = 120;
+            if (minY < 150) minY = 150;
             if (maxY > 360) maxY = 360;
             let newY = Math.floor(Math.random() * (maxY - minY + 1)) + minY;
+            newY = Math.floor(newY / 20) * 20; 
 
-            let newW = Math.floor(Math.random() * 200) + 100;
+            let newW = Math.floor(Math.random() * 200) + 120;
 
-            createPlatform(lastPlatformX + gap, newY, newW, 40);
+            // score > 0 : inimigos aparecem logo após a primeira plataforma
+            createPlatform(lastPlatformX + gap, newY, newW, 40, score > 0);
             
             lastPlatformX += gap + newW;
             lastPlatformY = newY;
@@ -372,62 +429,106 @@
             score++; 
             currentScoreDisplay.innerText = score;
         }
+        if (enemies.length > 0 && enemies[0].maxX < cameraX - 100) {
+            enemies.shift();
+        }
     }
 
-    // --- 7. DESENHO (DRAW) ---
+    // --- 7. DESENHO ---
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         ctx.save();
         ctx.translate(-cameraX, 0);
 
-        // Plataformas
-        ctx.fillStyle = "#5D4037"; // Terra
+        // --- PLATAFORMAS ---
+        const blockSize = 20; 
+        const grassHeight = 10; 
+
         for (let plat of platforms) {
-            ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
-            ctx.fillStyle = "#4CAF50"; // Grama
-            ctx.fillRect(plat.x, plat.y, plat.w, 8); 
-            ctx.fillStyle = "#5D4037";
+            ctx.fillStyle = "#4CAF50"; 
+            ctx.fillRect(plat.x, plat.y, plat.w, grassHeight);
+            ctx.fillStyle = "#2E7D32";
+            ctx.fillRect(plat.x, plat.y + grassHeight - 2, plat.w, 2);
+
+            ctx.strokeStyle = "#5D4037"; 
+            ctx.lineWidth = 2;
+
+            for (let by = plat.y + grassHeight; by < plat.y + plat.h; by += blockSize) {
+                for (let bx = plat.x; bx < plat.x + plat.w; bx += blockSize) {
+                    let currentBlockWidth = Math.min(blockSize, plat.x + plat.w - bx);
+                    let currentBlockHeight = Math.min(blockSize, plat.y + plat.h - by);
+
+                    ctx.fillStyle = "#8B4513"; 
+                    ctx.fillRect(bx, by, currentBlockWidth, currentBlockHeight);
+                    ctx.strokeRect(bx, by, currentBlockWidth, currentBlockHeight);
+
+                    ctx.fillStyle = "#5D4037"; 
+                    if (currentBlockWidth > 8 && currentBlockHeight > 8) ctx.fillRect(bx + 6, by + 6, 4, 4);
+                    if (currentBlockWidth > 15 && currentBlockHeight > 15) ctx.fillRect(bx + 14, by + 14, 3, 3);
+                }
+            }
         }
 
-        // --- DESENHO DO PERSONAGEM (Código, não imagem) ---
-        // Aqui desenhamos o robô usando quadrados para ele nunca sumir
+        // --- INIMIGOS ---
+        for (let enemy of enemies) {
+            ctx.fillStyle = enemy.color;
+            ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+            
+            ctx.fillStyle = "white";
+            ctx.fillRect(enemy.x + 4, enemy.y + 6, 8, 8);
+            ctx.fillRect(enemy.x + 20, enemy.y + 6, 8, 8);
+            
+            ctx.fillStyle = "red"; 
+            ctx.fillRect(enemy.x + 6, enemy.y + 8, 4, 4);
+            ctx.fillRect(enemy.x + 22, enemy.y + 8, 4, 4);
+            
+            ctx.fillStyle = "black";
+            ctx.fillRect(enemy.x + 8, enemy.y + 22, 16, 4);
+        }
+
+        // --- ROBÔ (PLAYER) ---
         ctx.save();
-        
-        // Vai para o centro do jogador
         ctx.translate(player.x + player.width / 2, player.y + player.height / 2);
         
-        // Vira o personagem se estiver olhando para esquerda
         if (player.facing === 'left') {
             ctx.scale(-1, 1); 
         }
 
-        // 1. Corpo
-        ctx.fillStyle = "#e74c3c"; // Vermelho
+        ctx.fillStyle = "#e74c3c";
         ctx.fillRect(-12, -10, 24, 26);
-
-        // 2. Cabeça
-        ctx.fillStyle = "#ecf0f1"; // Branco
+        ctx.fillStyle = "#ecf0f1";
         ctx.fillRect(-10, -26, 20, 16);
-
-        // 3. Olhos (Visor)
-        ctx.fillStyle = "#3498db"; // Azul
+        ctx.fillStyle = "#3498db";
         ctx.fillRect(2, -22, 10, 6);
-
-        // 4. Mochila a Jato (Jetpack)
-        ctx.fillStyle = "#95a5a6"; // Cinza
+        ctx.fillStyle = "#95a5a6";
         ctx.fillRect(-16, -8, 4, 16);
+        ctx.fillStyle = "#95a5a6";
+        let walkOffset = 0;
+        if (!player.jumping && Math.abs(player.dx) > 0.5) {
+            walkOffset = Math.sin(Date.now() / 80) * 4; 
+        }
+        ctx.fillRect(-10 + walkOffset, 16, 6, 4);
+        ctx.fillRect(4 - walkOffset, 16, 6, 4);
 
-        ctx.restore(); // Restaura virada
-        ctx.restore(); // Restaura câmera
+        ctx.restore(); 
+        ctx.restore(); 
     }
 
     // --- 8. EVENTOS ---
+    
     document.addEventListener("keydown", (e) => {
+        if (e.repeat) return; 
+
         if (e.code === "ArrowRight") keys.right = true;
         if (e.code === "ArrowLeft") keys.left = true;
+        
         if (e.code === "Space" || e.code === "ArrowUp") {
-            keys.jump = true;
+            if (!player.jumping) {
+                player.jumping = true;
+                player.dy = jumpForce; 
+                playSound('jump');
+            }
             e.preventDefault();
         }
         if (e.code === "Enter" && isGameOver) initGame();
@@ -436,18 +537,39 @@
     document.addEventListener("keyup", (e) => {
         if (e.code === "ArrowRight") keys.right = false;
         if (e.code === "ArrowLeft") keys.left = false;
-        if (e.code === "Space" || e.code === "ArrowUp") keys.jump = false;
+        
+        // Pulo Curto (Corte)
+        if (e.code === "Space" || e.code === "ArrowUp") {
+            if (player.dy < -3) {
+                player.dy = -3; 
+            }
+        }
     });
 
+    // Mobile
+    const jumpBtn = document.getElementById("btnJump");
+    
     document.getElementById("btnLeft").ontouchstart = (e) => { e.preventDefault(); keys.left = true; };
     document.getElementById("btnLeft").ontouchend = () => keys.left = false;
     document.getElementById("btnRight").ontouchstart = (e) => { e.preventDefault(); keys.right = true; };
     document.getElementById("btnRight").ontouchend = () => keys.right = false;
-    document.getElementById("btnJump").ontouchstart = (e) => { e.preventDefault(); keys.jump = true; };
-    document.getElementById("btnJump").ontouchend = () => keys.jump = false;
 
-    // Desenha a tela inicial (fundo)
-    createPlatform(0, 350, 800, 50);
+    jumpBtn.ontouchstart = (e) => { 
+        e.preventDefault(); 
+        if (!player.jumping) {
+            player.jumping = true;
+            player.dy = jumpForce;
+            playSound('jump');
+        }
+    };
+    
+    jumpBtn.ontouchend = (e) => {
+        if (player.dy < -3) {
+            player.dy = -3;
+        }
+    };
+    
+    createPlatform(0, 350, 800, 60);
     draw();
 
 </script>

@@ -111,6 +111,21 @@
             left: 30px;
         }
 
+        /* CAPA 3: SPACE SHOOTER (NOVO!) */
+        .thumb-space {
+            background-color: #000;
+            border: 2px solid #33ff33; /* Borda Verde do jogo */
+            box-sizing: border-box; /* Para a borda não aumentar o tamanho */
+        }
+        .thumb-space::after {
+            content: '🚀';
+            font-size: 40px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
         .projeto-info { flex-grow: 1; }
         .projeto-info h3 { margin: 0 0 10px 0; font-size: 1.4rem; }
         .projeto-info p { margin-bottom: 15px; color: #666; }
@@ -194,6 +209,16 @@
                 </div>
             </div>
 
+            <div class="projeto-item">
+                <div class="projeto-thumb thumb-space"></div>
+                
+                <div class="projeto-info">
+                    <h3>🚀 Space Shooter <span style="color: red; font-size: 0.7em;">(em desenvolvimento)</span></h3>
+                    <p>Jogo de navinha estilo retrô (Space Impact) com tiros, inimigos e explosões.</p>
+                    <a href="space_shooter.html" class="btn" target="_blank">Jogar Agora</a>
+                </div>
+            </div>
+
         </section>
 
         <section id="contato">
@@ -222,5 +247,3 @@
 
 </body>
 </html>
-
-

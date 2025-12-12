@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Space Shooter</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #111;
+            flex-direction: column;
+            user-select: none;
+            padding: 10px 0;
+            font-family: 'Courier New', Courier, monospace;
+            overflow: hidden;
+        }
+        
+        /* Moldura estilo Arcade/Nokia */
+        .game-container {
+            position: relative;
+            width: 800px;
+            height: 400px;
+            max-width: 95vw;
+            max-height: 55vh; 
+            outline: 4px solid #33ff33; /* Verde Retrô */
+            box-shadow: 0px 0px 20px rgba(51, 255, 51, 0.2);
+            background-color: #000;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            image-rendering: pixelated; 
+        }
+        
+        /* MENU */
+        #startScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            color: #33ff33;
+        }
+
+        #btnStart {
+            padding: 15px 40px;
+            font-size: 20px;
+            background-color: transparent;
+            color: #33ff33;
+            border: 2px solid #33ff33;
+            cursor: pointer;
+            text-transform: uppercase;
+            font-weight: bold;
+            font-family: 'Courier New', Courier, monospace;
+            margin-top: 20px;
+            transition: all 0.2s;
+        }
+        #btnStart:active { background-color: #33ff33; color: black; }
+
+        .big-text { font-size: 32px; font-weight: bold; margin-bottom: 10px; text-shadow: 0 0 10px #33ff33; }
+        .small-text { font-size: 16px; opacity: 0.8; }
+
+        /* HUD */
+        .hud { 
+            position: absolute; 
+            top: 10px; 
+            left: 10px; 
+            color: #33ff33; 
+            font-weight: bold;
+            z-index: 10;
+            font-size: 18px;
+            display: flex;
+            gap: 20px;
+        }
+        .hp-bar { color: #ff3333; }
+
+        /* CONTROLES MOBILE */
+        .controls {
+            display: none; 
+            margin-top: 15px;
+            width: 90%;
+            max-width: 500px;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .dpad-area { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+        .dpad-row { display: flex; gap: 5px; }
+        
+        button.ctrl-btn {
+            width: 55px;
+            height: 55px;
+            background-color: #222;
+            color: #33ff33;
+            border: 1px solid #33ff33;
+            border-radius: 8px;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 2px 0 #111;
+        }
+        button.ctrl-btn:active { background-color: #33ff33; color: black; transform: translateY(2px); box-shadow: none; }
+        
+        button.fire-btn {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background-color: #330000;
+            border: 2px solid #ff3333;
+            color: #ff3333;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        button.fire-btn:active { background-color: #ff3333; color: white; }
+
+        @media (max-width: 800px) { .controls { display: flex; } }
+    </style>
+</head>
+<body>
+
+<div class="game-container">
+    <canvas id="gameCanvas" width="800" height="400"></canvas>
+    
+    <div class="hud">
+        <span>SCORE: <span id="scoreVal">0</span></span>
+        <span class="hp-bar">HP: <span id="hpVal">3</span></span>
+    </div>
+
+    <div id="startScreen">
+        <div class="big-text">SPACE IMPACT</div>
+        <div class="small-text">Destrua os Aliens!</div>
+        <div id="finalScore" style="display:none; margin-top:10px;"></div>
+        <button id="btnStart">DECOLAR</button>
+    </div>
+</div>
+
+<div class="controls">
+    <div class="dpad-area">
+        <button class="ctrl-btn" id="btnUp">⬆️</button>
+        <div class="dpad-row">
+            <button class="ctrl-btn" id="btnLeft">⬅️</button>
+            <button class="ctrl-btn" id="btnDown">⬇️</button>
+            <button class="ctrl-btn" id="btnRight">➡️</button>
+        </div>
+    </div>
+    <button class="fire-btn" id="btnFire">FIRE</button>
+</div>
+
+<script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    
+    const startScreen = document.getElementById("startScreen");
+    const btnStart = document.getElementById("btnStart");
+    const scoreVal = document.getElementById("scoreVal");
+    const hpVal = document.getElementById("hpVal");
+    const finalScore = document.getElementById("finalScore");
+
+    // --- ÁUDIO (Sintetizador) ---
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    function playSound(type) {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        const now = audioCtx.currentTime;
+
+        if (type === 'shoot') {
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(800, now);
+            osc.frequency.exponentialRampToValueAtTime(100, now + 0.1);
+            gain.gain.setValueAtTime(0.05, now);
+            gain.gain.linearRampToValueAtTime(0, now + 0.1);
+            osc.start(now);
+            osc.stop(now + 0.1);
+        } else if (type === 'explosion') {
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(100, now);
+            osc.frequency.exponentialRampToValueAtTime(10, now + 0.3);
+            gain.gain.setValueAtTime(0.1, now);
+            gain.gain.linearRampToValueAtTime(0, now + 0.3);
+            osc.start(now);
+            osc.stop(now + 0.3);
+        }
+    }
+
+    // --- ESTRELAS DO FUNDO (Parallax) ---
+    const stars = [];
+    for(let i=0; i<50; i++) {
+        stars.push({
+            x: Math.random() * 800,
+            y: Math.random() * 400,
+            speed: Math.random() * 2 + 0.5,
+            size: Math.random() * 2
+        });
+    }
+
+    // --- VARIÁVEIS DO JOGO ---
+    let animationId;
+    let lastTime = 0;
+    let score = 0;
+    let isGameOver = true;
+    let enemySpawnTimer = 0;
+
+    const player = {
+        x: 50, y: 180, w: 40, h: 20, speed: 5, hp: 3,
+        dx: 0, dy: 0, cooldown: 0
+    };
+
+    const keys = { w:false, a:false, s:false, d:false, space:false };
+    let bullets = [];
+    let enemies = [];
+    let particles = [];
+
+    // --- INICIALIZAÇÃO ---
+    btnStart.onclick = initGame;
+
+    function initGame() {
+        player.x = 50; 
+        player.y = 180;
+        player.hp = 3;
+        bullets = [];
+        enemies = [];
+        particles = [];
+        score = 0;
+        isGameOver = false;
+        
+        scoreVal.innerText = score;
+        hpVal.innerText = player.hp;
+        startScreen.style.display = 'none';
+
+        if (animationId) cancelAnimationFrame(animationId);
+        animationId = requestAnimationFrame(gameLoop);
+    }
+
+    function gameOver() {
+        isGameOver = true;
+        finalScore.innerText = "FIM DE JOGO! Score: " + score;
+        finalScore.style.display = "block";
+        startScreen.style.display = "flex";
+        btnStart.innerText = "REINICIAR MISSÃO";
+    }
+
+    // --- LOOP PRINCIPAL ---
+    function gameLoop(timestamp) {
+        if(isGameOver) return;
+        
+        const dt = timestamp - lastTime;
+        lastTime = timestamp;
+
+        update();
+        draw();
+        
+        animationId = requestAnimationFrame(gameLoop);
+    }
+
+    // --- LÓGICA (UPDATE) ---
+    function update() {
+        // 1. Movimento Player (Com Limites de Tela)
+        if(keys.w) player.y -= player.speed;
+        if(keys.s) player.y += player.speed;
+        if(keys.a) player.x -= player.speed;
+        if(keys.d) player.x += player.speed;
+
+        if(player.y < 0) player.y = 0;
+        if(player.y + player.h > 400) player.y = 400 - player.h;
+        if(player.x < 0) player.x = 0;
+        if(player.x + player.w > 400) player.x = 400; // Limite na metade da tela
+
+        // 2. Tiro
+        if(player.cooldown > 0) player.cooldown--;
+        if(keys.space && player.cooldown <= 0) {
+            bullets.push({ x: player.x + player.w, y: player.y + player.h/2 - 2, w: 10, h: 4, speed: 10 });
+            player.cooldown = 15; // Velocidade do tiro
+            playSound('shoot');
+        }
+
+        // 3. Atualizar Balas
+        for(let i = bullets.length - 1; i >= 0; i--) {
+            let b = bullets[i];
+            b.x += b.speed;
+            if(b.x > 800) bullets.splice(i, 1);
+        }
+
+        // 4. Gerar Inimigos
+        enemySpawnTimer++;
+        if(enemySpawnTimer > 60) { // A cada 60 frames (aprox 1 seg)
+            enemySpawnTimer = 0;
+            let size = Math.random() * 20 + 20;
+            enemies.push({
+                x: 850,
+                y: Math.random() * (350 - size),
+                w: size, h: size,
+                speed: Math.random() * 2 + 2,
+                hp: Math.floor(size / 10), // Inimigos maiores tem mais vida
+                type: Math.random() > 0.5 ? 'rock' : 'ship'
+            });
+        }
+
+        // 5. Atualizar Inimigos e Colisões
+        for(let i = enemies.length - 1; i >= 0; i--) {
+            let e = enemies[i];
+            e.x -= e.speed;
+
+            // Colisão com Player
+            if(rectIntersect(player, e)) {
+                createExplosion(player.x, player.y, 20, "#ff3333");
+                player.hp--;
+                hpVal.innerText = player.hp;
+                playSound('explosion');
+                enemies.splice(i, 1);
+                if(player.hp <= 0) gameOver();
+                continue;
+            }
+
+            // Colisão com Balas
+            for(let j = bullets.length - 1; j >= 0; j--) {
+                let b = bullets[j];
+                if(rectIntersect(b, e)) {
+                    bullets.splice(j, 1); // Remove bala
+                    e.hp--;
+                    createExplosion(b.x, b.y, 5, "#ffff00"); // Faísca
+                    if(e.hp <= 0) {
+                        createExplosion(e.x, e.y, 15, "#33ff33"); // Explosão Verde
+                        enemies.splice(i, 1);
+                        playSound('explosion');
+                        score += 10;
+                        scoreVal.innerText = score;
+                    }
+                    break; 
+                }
+            }
+
+            if(e.x + e.w < 0) enemies.splice(i, 1); // Remove se sair da tela
+        }
+
+        // 6. Atualizar Partículas (Explosões)
+        for(let i = particles.length - 1; i >= 0; i--) {
+            let p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.life--;
+            if(p.life <= 0) particles.splice(i, 1);
+        }
+
+        // 7. Fundo (Estrelas)
+        stars.forEach(s => {
+            s.x -= s.speed;
+            if(s.x < 0) { s.x = 800; s.y = Math.random() * 400; }
+        });
+    }
+
+    // --- DESENHO (DRAW) ---
+    function draw() {
+        ctx.fillStyle = "black";
+        ctx.fillRect(0, 0, 800, 400);
+
+        // Estrelas
+        ctx.fillStyle = "white";
+        stars.forEach(s => ctx.fillRect(s.x, s.y, s.size, s.size));
+
+        // Player (Desenhando a Nave Pixel Art via Código)
+        ctx.fillStyle = "#33ff33"; // Verde Nokia
+        // Corpo
+        ctx.fillRect(player.x, player.y + 5, 30, 10);
+        // Cabine
+        ctx.fillRect(player.x + 10, player.y, 10, 5);
+        // Motor
+        ctx.fillRect(player.x - 5, player.y + 2, 5, 16);
+        // Ponta (Arma)
+        ctx.fillStyle = "#ff3333";
+        ctx.fillRect(player.x + 30, player.y + 8, 5, 4);
+
+        // Balas
+        ctx.fillStyle = "#ffff00"; // Amarelo
+        bullets.forEach(b => ctx.fillRect(b.x, b.y, b.w, b
